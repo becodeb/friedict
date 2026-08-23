@@ -1,0 +1,83 @@
+# ============================================================================
+# Cantado — reverse proxy
+# ----------------------------------------------------------------------------
+# Un solo puerto abierto al mundo: el 443 (más el 80, que sólo redirige).
+# Postgres, Auth, Realtime y Kong quedan en la red interna de Docker y no se
+# publican con `ports:` en ningún compose.
+#
+# Reemplazá `tudominio.com` por el tuyo. Los dos subdominios tienen que apuntar
+# por DNS (registro A) a la IP de la VM ANTES de levantar Caddy: Let's Encrypt
+# valida resolviendo el nombre.
+# ============================================================================
+
+{
+	# Cambialo por tu mail: Let's Encrypt avisa ahí si un certificado va a vencer.
+	email vos@tudominio.com
+}
+
+# ----------------------------------------------------------------------------
+# La aplicación: archivos estáticos del build
+# ----------------------------------------------------------------------------
+cantado.tudominio.com {
+	root * /srv/cantado
+	encode zstd gzip
+
+	# Es una SPA: cualquier ruta que no sea un archivo real devuelve index.html,
+	# si no /g/<id>/ranking daría 404 al recargar.
+	try_files {path} /index.html
+	file_server
+
+	# El service worker no se cachea: si el navegador se queda con uno viejo,
+	# la app queda clavada en una versión anterior y no hay forma de sacarla.
+	@sw path /sw.js /registerSW.js /manifest.webmanifest
+	header @sw Cache-Control "no-cache, no-store, must-revalidate"
+
+	# Los assets llevan hash en el nombre, así que se pueden cachear para siempre.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		# Los grupos son privados: que ningún buscador los indexe.
+		X-Robots-Tag "noindex, nofollow"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/cantado.log
+		format json
+	}
+}
+
+# ----------------------------------------------------------------------------
+# La API de Supabase (Kong)
+# ----------------------------------------------------------------------------
+# Subdominio y no una ruta como /api: Kong enruta desde la raíz de su host, y
+# montarlo bajo un prefijo obliga a reescribir rutas en todos lados.
+api.cantado.tudominio.com {
+	encode zstd gzip
+
+	# `kong` es el nombre del servicio dentro de la red de Docker, no un host
+	# público. Caddy hace el upgrade a WebSocket solo, que es lo que necesita
+	# Realtime; con nginx habría que configurarlo a mano.
+	reverse_proxy kong:8000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/api.log
+		format json
+	}
+}

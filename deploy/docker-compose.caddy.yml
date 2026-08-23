@@ -1,0 +1,36 @@
+# ============================================================================
+# Caddy — el único servicio que publica puertos al exterior.
+# ----------------------------------------------------------------------------
+# Se levanta junto al stack self-hosted de Supabase y se une a SU red, para
+# poder hablarle a `kong` por nombre sin exponerlo:
+#
+#   docker compose -f docker-compose.yml -f ../cantado/deploy/docker-compose.caddy.yml up -d
+#
+# (desde el directorio `docker/` del repo de Supabase — ver deploy/README.md)
+# ============================================================================
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: cantado_caddy
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # El build de la app. Lo llena `deploy/publicar.sh`.
+      - cantado_dist:/srv/cantado:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      - kong
+
+volumes:
+  cantado_dist:
+    external: true
+    name: cantado_dist
+  caddy_data:
+  caddy_config:
+  caddy_logs:

@@ -1,0 +1,215 @@
+/* ==========================================================================
+   Cantado — tokens de diseño
+   --------------------------------------------------------------------------
+   Design Read: aplicación social privada para amigos. Minimalismo editorial,
+   tipografía fuerte, interacción táctil y motion expresivo. Divertida sin ser
+   infantil, cuidada sin parecer una fintech.
+
+   Un solo color de acento (tomate) en toda la app. Los colores de las series
+   del gráfico son datos, no marca, y viven en --series-*.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* --- Superficies ------------------------------------------------------ */
+  --bg: oklch(0.976 0.005 85); /* blanco roto cálido */
+  --bg-sunken: oklch(0.955 0.006 85);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.962 0.005 85);
+
+  /* --- Tinta ------------------------------------------------------------ */
+  --ink: oklch(0.22 0.012 60); /* 15:1 sobre --bg */
+  --ink-2: oklch(0.45 0.012 60); /* 7:1  — texto secundario */
+  --ink-3: oklch(0.55 0.01 60); /* 4.7:1 — metadatos */
+
+  /* --- Líneas ----------------------------------------------------------- */
+  --line: oklch(0.9 0.006 80);
+  --line-strong: oklch(0.84 0.008 80);
+
+  /* --- Acento: tomate --------------------------------------------------- */
+  /* L=0.58 no es casual: es el punto donde el texto blanco encima llega a
+     4.7:1 y cumple AA. --accent-hi es más brillante y sólo se usa en gráficos
+     y rails, nunca debajo de texto. */
+  --accent: oklch(0.58 0.19 30);
+  --accent-hover: oklch(0.53 0.19 30);
+  --accent-hi: oklch(0.66 0.19 33);
+  --accent-fg: oklch(0.99 0 0);
+  --accent-ink: oklch(0.5 0.17 31); /* acento legible como texto sobre --bg */
+  --accent-wash: oklch(0.955 0.028 40);
+  --accent-line: oklch(0.86 0.07 35);
+
+  /* --- Estados de una predicción ---------------------------------------- */
+  --status-testing: oklch(0.58 0.11 72); /* En prueba — ocre */
+  --status-testing-wash: oklch(0.955 0.03 82);
+  --status-active: var(--accent);
+  --status-closed: oklch(0.48 0.03 250);
+  --status-resolved: oklch(0.48 0.1 158);
+  --status-resolved-wash: oklch(0.955 0.035 160);
+  --status-expired: oklch(0.62 0.008 60);
+  --status-cancelled: oklch(0.62 0.008 60);
+
+  --danger: oklch(0.52 0.19 27);
+  --danger-wash: oklch(0.955 0.03 27);
+
+  /* --- Paleta de avatares (profiles.accent 0-7) ------------------------- */
+  --avatar-0: oklch(0.62 0.16 30);
+  --avatar-1: oklch(0.6 0.12 150);
+  --avatar-2: oklch(0.58 0.13 255);
+  --avatar-3: oklch(0.65 0.13 75);
+  --avatar-4: oklch(0.58 0.15 330);
+  --avatar-5: oklch(0.6 0.1 200);
+  --avatar-6: oklch(0.62 0.14 55);
+  --avatar-7: oklch(0.55 0.11 285);
+
+  /* --- Series de datos (gráfico de evolución) --------------------------- */
+  --series-0: oklch(0.58 0.19 30);
+  --series-1: oklch(0.52 0.11 230);
+  --series-2: oklch(0.58 0.11 155);
+  --series-3: oklch(0.62 0.13 72);
+  --series-4: oklch(0.52 0.13 320);
+  --series-5: oklch(0.5 0.08 200);
+
+  /* --- Radios: escala corta y deliberada -------------------------------- */
+  --r-xs: 4px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+
+  /* --- Sombras teñidas, nunca negro puro -------------------------------- */
+  --shadow-1: 0 1px 2px oklch(0.3 0.02 60 / 0.05);
+  --shadow-2:
+    0 1px 2px oklch(0.3 0.02 60 / 0.06), 0 8px 24px -14px oklch(0.3 0.02 60 / 0.22);
+  --shadow-3:
+    0 2px 6px oklch(0.3 0.02 60 / 0.07), 0 28px 60px -28px oklch(0.3 0.02 60 / 0.3);
+
+  /* --- Tipografía ------------------------------------------------------- */
+  --font-sans:
+    'Geist Variable', 'Geist', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+
+  --step-display: clamp(2.5rem, 9vw, 4rem);
+  --step-title: clamp(1.5rem, 5vw, 1.875rem);
+  --step-question: clamp(1.0625rem, 4vw, 1.3125rem);
+  --step-body: 0.9375rem;
+  --step-meta: 0.75rem;
+  --step-micro: 0.6875rem;
+
+  /* --- Layout ----------------------------------------------------------- */
+  --feed-width: 34rem;
+  --gutter: 1.25rem;
+  --tap: 44px; /* objetivo táctil mínimo */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --bottom-nav-h: 60px;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: oklch(0.18 0.008 60);
+  --bg-sunken: oklch(0.155 0.008 60);
+  --surface: oklch(0.215 0.008 60);
+  --surface-2: oklch(0.25 0.008 60);
+
+  --ink: oklch(0.95 0.006 85);
+  --ink-2: oklch(0.76 0.008 85);
+  --ink-3: oklch(0.63 0.008 85);
+
+  --line: oklch(0.3 0.008 70);
+  --line-strong: oklch(0.4 0.008 70);
+
+  --accent: oklch(0.68 0.175 33);
+  --accent-hover: oklch(0.73 0.175 33);
+  --accent-hi: oklch(0.72 0.18 35);
+  --accent-fg: oklch(0.17 0.012 40);
+  --accent-ink: oklch(0.75 0.16 33);
+  --accent-wash: oklch(0.28 0.055 33);
+  --accent-line: oklch(0.38 0.08 33);
+
+  --status-testing: oklch(0.78 0.12 78);
+  --status-testing-wash: oklch(0.29 0.045 78);
+  --status-closed: oklch(0.7 0.04 250);
+  --status-resolved: oklch(0.74 0.13 158);
+  --status-resolved-wash: oklch(0.28 0.05 160);
+  --status-expired: oklch(0.5 0.008 60);
+  --status-cancelled: oklch(0.5 0.008 60);
+
+  --danger: oklch(0.7 0.17 27);
+  --danger-wash: oklch(0.29 0.06 27);
+
+  --avatar-0: oklch(0.72 0.15 30);
+  --avatar-1: oklch(0.72 0.12 150);
+  --avatar-2: oklch(0.7 0.12 255);
+  --avatar-3: oklch(0.76 0.13 75);
+  --avatar-4: oklch(0.7 0.14 330);
+  --avatar-5: oklch(0.72 0.1 200);
+  --avatar-6: oklch(0.74 0.13 55);
+  --avatar-7: oklch(0.68 0.11 285);
+
+  --series-0: oklch(0.7 0.17 33);
+  --series-1: oklch(0.68 0.11 230);
+  --series-2: oklch(0.72 0.11 155);
+  --series-3: oklch(0.76 0.12 72);
+  --series-4: oklch(0.68 0.13 320);
+  --series-5: oklch(0.68 0.08 200);
+
+  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-2: 0 1px 2px oklch(0 0 0 / 0.35), 0 8px 24px -14px oklch(0 0 0 / 0.6);
+  --shadow-3: 0 2px 6px oklch(0 0 0 / 0.4), 0 28px 60px -28px oklch(0 0 0 / 0.7);
+}
+
+/* --------------------------------------------------------------------------
+   Puente hacia Tailwind. `@theme inline` hace que las utilidades apunten a la
+   variable y no a su valor, que es lo que permite cambiar de tema sin
+   recompilar ni duplicar toda la paleta.
+   -------------------------------------------------------------------------- */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-sunken: var(--bg-sunken);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-hi: var(--accent-hi);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-line: var(--accent-line);
+
+  --color-testing: var(--status-testing);
+  --color-testing-wash: var(--status-testing-wash);
+  --color-closed: var(--status-closed);
+  --color-resolved: var(--status-resolved);
+  --color-resolved-wash: var(--status-resolved-wash);
+  --color-expired: var(--status-expired);
+  --color-danger: var(--danger);
+  --color-danger-wash: var(--danger-wash);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-pill: var(--r-pill);
+
+  --shadow-e1: var(--shadow-1);
+  --shadow-e2: var(--shadow-2);
+  --shadow-e3: var(--shadow-3);
+}
+
+/* El tema se controla por atributo, no por clase, para poder fijarlo en el
+   <html> antes del primer pintado sin flash. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));

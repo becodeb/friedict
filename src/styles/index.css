@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+/* Fuentes self-hosted: nada de pedidos a un CDN externo, y el service worker
+   las precachea junto al app shell. */
+@import '@fontsource-variable/geist/index.css';
+@import '@fontsource-variable/geist-mono/index.css';
+
+@import './tokens.css';
+@import './motion.css';
+@import './base.css';

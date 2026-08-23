@@ -1,0 +1,1046 @@
+/* Todo este archivo vive en @layer components. En Tailwind v4 el CSS sin capa
+   gana sobre TODAS las capas, asi que dejarlo suelto haria que estas reglas
+   pisaran las utilidades (button { color: inherit } anulaba text-[...], y
+   p { margin: 0 } anulaba mt-*). Dentro de la capa, las utilidades ganan. */
+
+@layer components {
+  /* ==========================================================================
+     Cantado — biblioteca de motion
+     --------------------------------------------------------------------------
+     Todas las recetas de este archivo están tomadas del catálogo local
+     `transitions-dev-react-css/` (transitions.dev). El CSS se conserva tal cual
+     en su comportamiento; lo único que cambia es que las duraciones, curvas,
+     distancias y blurs ya no se declaran sueltas por receta sino que apuntan a
+     los tokens de acá arriba. Un valor, un lugar.
+
+     Archivo de origen de cada bloque anotado sobre el bloque.
+
+     Reglas que no se rompen:
+       · nunca `transition: all`
+       · se animan transform / opacity / filter (y width-height sólo donde la
+         receta original lo hace a propósito: card-resize y plus-menu-morph)
+       · todo respeta prefers-reduced-motion
+     ========================================================================== */
+
+  :root {
+    /* --- Duraciones ------------------------------------------------------- */
+    --motion-instant: 80ms;
+    --motion-fast: 150ms;
+    --motion-base: 250ms;
+    --motion-mid: 350ms;
+    --motion-slow: 400ms;
+    --motion-slower: 500ms;
+
+    /* --- Curvas ----------------------------------------------------------- */
+    /* La curva dominante del catálogo. */
+    --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+    /* Rebote contenido (success-check bob, toggle, notification-badge). */
+    --ease-emphasized: cubic-bezier(0.34, 1.35, 0.64, 1);
+    /* Rebote un poco más suelto (number-pop-in). */
+    --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+    /* Salidas: rápidas y sin rebote. */
+    --ease-exit: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* --- Distancias y blur ------------------------------------------------ */
+    --motion-shift-xs: 4px;
+    --motion-shift-sm: 8px;
+    --motion-shift-md: 12px;
+    --motion-shift-lg: 16px;
+    --motion-shift-xl: 40px;
+    --motion-blur-sm: 2px;
+    --motion-blur-md: 3px;
+
+    /* --- Escalas ---------------------------------------------------------- */
+    --motion-scale-near: 0.99;
+    --motion-scale-sm: 0.97;
+    --motion-scale-md: 0.96;
+  }
+
+  /* --------------------------------------------------------------------------
+     texts-reveal — transitions-dev-react-css/texts-reveal/texts-reveal.txt
+     Uso: entrada de encabezados, onboarding y estados vacíos.
+     -------------------------------------------------------------------------- */
+  :root {
+    --stagger-dur: var(--motion-slower);
+    --stagger-distance: var(--motion-shift-md);
+    --stagger-stagger: 40ms;
+    --stagger-blur: var(--motion-blur-md);
+    --stagger-ease: var(--ease-standard);
+  }
+
+  .t-stagger-line {
+    display: block;
+    opacity: 0;
+    transform: translateY(var(--stagger-distance));
+    filter: blur(var(--stagger-blur));
+    transition:
+      opacity var(--stagger-dur) var(--stagger-ease),
+      transform var(--stagger-dur) var(--stagger-ease),
+      filter var(--stagger-dur) var(--stagger-ease);
+    will-change: transform, opacity, filter;
+  }
+  .t-stagger-line--2 {
+    transition-delay: var(--stagger-stagger);
+  }
+  .t-stagger-line--3 {
+    transition-delay: calc(var(--stagger-stagger) * 2);
+  }
+  .t-stagger-line--4 {
+    transition-delay: calc(var(--stagger-stagger) * 3);
+  }
+
+  .t-stagger.is-shown .t-stagger-line {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  /* La salida se desacopla del stagger: mismo fade para todas las líneas. */
+  .t-stagger.is-hiding .t-stagger-line {
+    opacity: 0;
+    transform: translateY(0);
+    filter: blur(0);
+    transition:
+      opacity 200ms ease,
+      transform 0s linear,
+      filter 0s linear;
+    transition-delay: 0s;
+  }
+
+  /* --------------------------------------------------------------------------
+     page-side-by-side — transitions-dev-react-css/page-side-by-side/…
+     Uso: navegación feed ↔ detalle de predicción.
+     -------------------------------------------------------------------------- */
+  :root {
+    --page-slide-dur: var(--motion-base);
+    --page-fade-dur: var(--motion-base);
+    --page-slide-distance: var(--motion-shift-sm);
+    --page-blur: var(--motion-blur-md);
+    --page-stagger: 0ms;
+    --page-exit-enabled: 1;
+    --page-slide-ease: var(--ease-standard);
+    --page-fade-ease: var(--ease-standard);
+  }
+
+  /* Sin `fill-mode`, y sin keyframe `to`, a propósito.
+     Con `both` el elemento conserva `transform: translateX(0)` para siempre, y
+     un transform —aunque sea la identidad— convierte al elemento en bloque
+     contenedor de sus descendientes `position: fixed`. Eso desplazaba la capa
+     de confeti y agregaba scroll horizontal. Sin fill-mode, al terminar la
+     animación no queda ningún transform aplicado. */
+  .t-page-enter {
+    animation: t-page-in var(--page-slide-dur) var(--page-slide-ease);
+  }
+  .t-page-enter[data-direction='back'] {
+    --t-page-from-x: calc(var(--page-slide-distance) * -1);
+  }
+  .t-page-enter[data-direction='forward'] {
+    --t-page-from-x: var(--page-slide-distance);
+  }
+  @keyframes t-page-in {
+    from {
+      opacity: 0;
+      transform: translateX(var(--t-page-from-x, 0px));
+      filter: blur(var(--page-blur));
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     card-resize — transitions-dev-react-css/card-resize/card-resize.txt
+     Uso: la tarjeta de predicción cambia de alto al pasar de "En prueba" a
+     confirmada, o al desplegar el detalle de opciones.
+     -------------------------------------------------------------------------- */
+  :root {
+    --resize-dur: 300ms;
+    --resize-ease: var(--ease-standard);
+  }
+
+  .t-resize {
+    transition:
+      height var(--resize-dur) var(--resize-ease),
+      grid-template-rows var(--resize-dur) var(--resize-ease);
+    will-change: height;
+  }
+  /* Colapsable sin altura fija: la fila del grid va de 0fr a 1fr. */
+  .t-collapse {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--resize-dur) var(--resize-ease);
+  }
+  .t-collapse[data-open='true'] {
+    grid-template-rows: 1fr;
+  }
+  .t-collapse > * {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* --------------------------------------------------------------------------
+     tabs-sliding — transitions-dev-react-css/tabs-sliding/tabs-sliding.txt
+     Uso: Activas / En prueba / Cerradas.
+     -------------------------------------------------------------------------- */
+  :root {
+    --tabs-dur: var(--motion-base);
+    --tabs-ease: var(--ease-standard);
+  }
+
+  .t-tabs {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px;
+    border-radius: var(--r-pill);
+    background: var(--bg-sunken);
+  }
+  .t-tab {
+    position: relative;
+    appearance: none;
+    border: 0;
+    background: transparent;
+    /* 44px: objetivo tactil minimo. El alto lo fija el boton, no el texto. */
+    min-height: 44px;
+    padding: 4px 14px;
+    color: var(--ink-3);
+    cursor: pointer;
+    border-radius: var(--r-pill);
+    z-index: 1;
+    transition: color var(--tabs-dur) var(--tabs-ease);
+  }
+  .t-tab:not([aria-selected='true']):hover,
+  .t-tab[aria-selected='true'] {
+    color: var(--ink);
+  }
+  .t-tabs-pill {
+    position: absolute;
+    top: 3px;
+    left: 0;
+    height: 44px;
+    width: 0;
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+    border-radius: var(--r-pill);
+    transform: translateX(0);
+    transition:
+      transform var(--tabs-dur) var(--tabs-ease),
+      width var(--tabs-dur) var(--tabs-ease);
+    will-change: transform, width;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* --------------------------------------------------------------------------
+     text-states-swap — transitions-dev-react-css/text-states-swap/…
+     Uso: "En prueba" → "Confirmada", y el contador de participantes.
+     -------------------------------------------------------------------------- */
+  :root {
+    --text-swap-dur: var(--motion-fast);
+    --text-swap-translate-y: var(--motion-shift-xs);
+    --text-swap-blur: var(--motion-blur-sm);
+    --text-swap-ease: ease-in-out;
+  }
+
+  .t-text-swap {
+    display: inline-block;
+    transform: translateY(0);
+    filter: blur(0);
+    opacity: 1;
+    transition:
+      transform var(--text-swap-dur) var(--text-swap-ease),
+      filter var(--text-swap-dur) var(--text-swap-ease),
+      opacity var(--text-swap-dur) var(--text-swap-ease);
+    will-change: transform, filter, opacity;
+  }
+  .t-text-swap.is-exit {
+    transform: translateY(calc(var(--text-swap-translate-y) * -1));
+    filter: blur(var(--text-swap-blur));
+    opacity: 0;
+  }
+  .t-text-swap.is-enter-start {
+    transform: translateY(var(--text-swap-translate-y));
+    filter: blur(var(--text-swap-blur));
+    opacity: 0;
+    transition: none;
+  }
+
+  /* --------------------------------------------------------------------------
+     number-pop-in — transitions-dev-react-css/number-pop-in/number-pop-in.txt
+     Uso: puntos del ranking y cantidad de participantes.
+     -------------------------------------------------------------------------- */
+  :root {
+    --digit-dur: var(--motion-slower);
+    --digit-distance: var(--motion-shift-sm);
+    --digit-stagger: 70ms;
+    --digit-blur: var(--motion-blur-sm);
+    --digit-ease: var(--ease-spring);
+    --digit-dir-x: 0;
+    --digit-dir-y: 1;
+  }
+
+  @keyframes t-digit-pop-in {
+    0% {
+      transform: translate(
+        calc(var(--digit-distance) * var(--digit-dir-x)),
+        calc(var(--digit-distance) * var(--digit-dir-y))
+      );
+      opacity: 0;
+      filter: blur(var(--digit-blur));
+    }
+    100% {
+      transform: translate(0, 0);
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+
+  .t-digit-group {
+    display: inline-flex;
+    align-items: baseline;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-digit {
+    display: inline-block;
+    will-change: transform, opacity, filter;
+  }
+  .t-digit-group.is-animating .t-digit {
+    animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
+  }
+  .t-digit-group.is-animating .t-digit[data-stagger='1'] {
+    animation-delay: var(--digit-stagger);
+  }
+  .t-digit-group.is-animating .t-digit[data-stagger='2'] {
+    animation-delay: calc(var(--digit-stagger) * 2);
+  }
+
+  /* --------------------------------------------------------------------------
+     success-check — transitions-dev-react-css/success-check/success-check.txt
+     Uso: voto guardado, resultado confirmado.
+     -------------------------------------------------------------------------- */
+  :root {
+    --check-opacity-dur: var(--motion-slower);
+    --check-rotate-dur: var(--motion-slower);
+    --check-rotate-from: 80deg;
+    --check-bob-dur: var(--motion-slower);
+    --check-y-amount: var(--motion-shift-xl);
+    --check-blur-dur: var(--motion-slower);
+    --check-blur-from: 10px;
+    --check-path-dur: var(--motion-slower);
+    --check-path-delay: var(--motion-instant);
+    --check-ease-out: var(--ease-standard);
+    --check-ease-bob: var(--ease-emphasized);
+  }
+
+  .t-success-check {
+    display: inline-block;
+    transform-origin: center;
+    opacity: 0;
+    will-change: transform, opacity, filter;
+  }
+  .t-success-check svg {
+    display: block;
+    overflow: visible;
+  }
+  .t-success-check svg path {
+    stroke-dasharray: 22;
+    stroke-dashoffset: 22;
+  }
+  .t-success-check[data-state='in'] {
+    animation:
+      t-check-fade var(--check-opacity-dur) var(--check-ease-out) forwards,
+      t-check-rotate var(--check-rotate-dur) var(--check-ease-out) forwards,
+      t-check-blur var(--check-blur-dur) var(--check-ease-out) forwards,
+      t-check-bob var(--check-bob-dur) var(--check-ease-bob) forwards;
+  }
+  .t-success-check[data-state='in'] svg path {
+    animation: t-check-draw var(--check-path-dur) var(--check-ease-out)
+      var(--check-path-delay, 0ms) forwards;
+  }
+  @keyframes t-check-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes t-check-rotate {
+    from {
+      transform: rotate(var(--check-rotate-from));
+    }
+    to {
+      transform: rotate(0deg);
+    }
+  }
+  @keyframes t-check-blur {
+    from {
+      filter: blur(var(--check-blur-from));
+    }
+    to {
+      filter: blur(0);
+    }
+  }
+  @keyframes t-check-bob {
+    from {
+      translate: 0 var(--check-y-amount);
+    }
+    to {
+      translate: 0 0;
+    }
+  }
+  @keyframes t-check-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     modal — transitions-dev-react-css/modal/modal.txt
+     -------------------------------------------------------------------------- */
+  :root {
+    --modal-open-dur: var(--motion-base);
+    --modal-close-dur: var(--motion-fast);
+    --modal-scale: var(--motion-scale-md);
+    --modal-scale-close: var(--motion-scale-md);
+    --modal-ease: var(--ease-standard);
+  }
+
+  .t-modal {
+    transform-origin: center;
+    transform: scale(var(--modal-scale));
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform var(--modal-open-dur) var(--modal-ease),
+      opacity var(--modal-open-dur) var(--modal-ease);
+    will-change: transform, opacity;
+  }
+  .t-modal.is-open {
+    transform: scale(1);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .t-modal.is-closing {
+    transform: scale(var(--modal-scale-close));
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform var(--modal-close-dur) var(--modal-ease),
+      opacity var(--modal-close-dur) var(--modal-ease);
+  }
+  .t-scrim {
+    opacity: 0;
+    transition: opacity var(--modal-close-dur) var(--modal-ease);
+  }
+  .t-scrim[data-open='true'] {
+    opacity: 1;
+    transition: opacity var(--modal-open-dur) var(--modal-ease);
+  }
+
+  /* --------------------------------------------------------------------------
+     .t-sheet — composición de dos recetas en un solo componente.
+
+     En mobile es `panel-reveal`: sube desde abajo. En desktop (>=640px) es
+     `modal`: escala desde 0.96 en el centro. No se puede resolver con los
+     prefijos responsive de Tailwind porque son clases propias, así que el corte
+     vive acá, que además es donde se lee mejor.
+     -------------------------------------------------------------------------- */
+  .t-sheet {
+    transform: translateY(var(--panel-translate-y));
+    opacity: 0;
+    filter: blur(var(--panel-blur));
+    pointer-events: none;
+    will-change: transform, opacity, filter;
+    transition:
+      transform var(--panel-close-dur) var(--panel-ease),
+      opacity var(--panel-close-dur) var(--panel-ease),
+      filter var(--panel-close-dur) var(--panel-ease);
+  }
+  .t-sheet[data-open='true'] {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+    pointer-events: auto;
+    transition:
+      transform var(--panel-open-dur) var(--panel-ease),
+      opacity var(--panel-open-dur) var(--panel-ease),
+      filter var(--panel-open-dur) var(--panel-ease);
+  }
+
+  @media (min-width: 640px) {
+    .t-sheet {
+      transform-origin: center;
+      transform: scale(var(--modal-scale));
+      filter: none;
+      transition:
+        transform var(--modal-close-dur) var(--modal-ease),
+        opacity var(--modal-close-dur) var(--modal-ease);
+    }
+    .t-sheet[data-open='true'] {
+      transform: scale(1);
+      filter: none;
+      transition:
+        transform var(--modal-open-dur) var(--modal-ease),
+        opacity var(--modal-open-dur) var(--modal-ease);
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     menu-dropdown — transitions-dev-react-css/menu-dropdown/menu-dropdown.txt
+     -------------------------------------------------------------------------- */
+  :root {
+    --dropdown-open-dur: var(--motion-base);
+    --dropdown-close-dur: var(--motion-fast);
+    --dropdown-pre-scale: var(--motion-scale-sm);
+    --dropdown-closing-scale: var(--motion-scale-near);
+    --dropdown-ease: var(--ease-standard);
+  }
+
+  .t-dropdown {
+    transform-origin: top left;
+    transform: scale(var(--dropdown-pre-scale));
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform var(--dropdown-open-dur) var(--dropdown-ease),
+      opacity var(--dropdown-open-dur) var(--dropdown-ease);
+    will-change: transform, opacity;
+  }
+  .t-dropdown[data-origin='top-right'] {
+    transform-origin: top right;
+  }
+  .t-dropdown[data-origin='bottom-right'] {
+    transform-origin: bottom right;
+  }
+  .t-dropdown[data-origin='bottom-center'] {
+    transform-origin: bottom center;
+  }
+  .t-dropdown.is-open {
+    transform: scale(1);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .t-dropdown.is-closing {
+    transform: scale(var(--dropdown-closing-scale));
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform var(--dropdown-close-dur) var(--dropdown-ease),
+      opacity var(--dropdown-close-dur) var(--dropdown-ease);
+  }
+
+  /* --------------------------------------------------------------------------
+     panel-reveal — transitions-dev-react-css/panel-reveal/panel-reveal.txt
+     Uso: sheet móvil de crear predicción, miembros e invitación.
+     -------------------------------------------------------------------------- */
+  :root {
+    --panel-open-dur: var(--motion-slow);
+    --panel-close-dur: var(--motion-mid);
+    --panel-translate-y: 100px;
+    --panel-blur: var(--motion-blur-sm);
+    --panel-ease: var(--ease-standard);
+  }
+
+  .t-panel-slide {
+    transform: translateY(var(--panel-translate-y));
+    opacity: 0;
+    filter: blur(var(--panel-blur));
+    pointer-events: none;
+    transition:
+      transform var(--panel-close-dur) var(--panel-ease),
+      opacity var(--panel-close-dur) var(--panel-ease),
+      filter var(--panel-close-dur) var(--panel-ease);
+    will-change: transform, opacity, filter;
+  }
+  .t-panel-slide[data-open='true'] {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+    pointer-events: auto;
+    transition:
+      transform var(--panel-open-dur) var(--panel-ease),
+      opacity var(--panel-open-dur) var(--panel-ease),
+      filter var(--panel-open-dur) var(--panel-ease);
+  }
+
+  /* --------------------------------------------------------------------------
+     toast — transitions-dev-react-css/toast/toast.txt
+     -------------------------------------------------------------------------- */
+  :root {
+    --toast-open: var(--motion-mid);
+    --toast-close: var(--motion-base);
+    --toast-distance: var(--motion-shift-lg);
+    --toast-blur: var(--motion-blur-sm);
+    --toast-scale: var(--motion-scale-sm);
+    --toast-ease: var(--ease-standard);
+  }
+
+  .t-toast {
+    opacity: 0;
+    transform: translateY(var(--toast-distance)) scale(var(--toast-scale));
+    filter: blur(var(--toast-blur));
+    will-change: transform, opacity, filter;
+    transition:
+      opacity var(--toast-close) var(--toast-ease),
+      transform var(--toast-close) var(--toast-ease),
+      filter var(--toast-close) var(--toast-ease);
+  }
+  .t-toast.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    transition:
+      opacity var(--toast-open) var(--toast-ease),
+      transform var(--toast-open) var(--toast-ease),
+      filter var(--toast-open) var(--toast-ease);
+  }
+
+  /* --------------------------------------------------------------------------
+     skeleton-reveal — transitions-dev-react-css/skeleton-reveal/…
+     -------------------------------------------------------------------------- */
+  :root {
+    --pulse-dur: 1200ms;
+    --pulse-min: 0.5;
+    --reveal-dur: var(--motion-slow);
+    --reveal-blur: var(--motion-blur-sm);
+    --reveal-ease: ease-in-out;
+  }
+
+  .t-skel-in {
+    animation: t-skel-reveal var(--reveal-dur) var(--reveal-ease) both;
+  }
+  @keyframes t-skel-reveal {
+    from {
+      opacity: 0;
+      filter: blur(var(--reveal-blur));
+    }
+    to {
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+  .t-skel-pulse > * {
+    animation: t-skel-pulse var(--pulse-dur) ease-in-out infinite;
+  }
+  @keyframes t-skel-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: var(--pulse-min);
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     error-state-shake — transitions-dev-react-css/error-state-shake/…
+     -------------------------------------------------------------------------- */
+  :root {
+    --shake-distance: 6px;
+    --shake-overshoot: 4px;
+    --shake-dur-a: 80ms;
+    --shake-dur-b: 60ms;
+    --shake-ease: var(--ease-standard);
+    --revert-dur: 280ms;
+  }
+
+  .t-input {
+    transition: border-color var(--motion-fast) ease-out;
+    will-change: transform;
+  }
+  .t-input.is-shaking {
+    animation: t-input-shake
+      calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2) linear;
+  }
+  /* Los stops son duraciones acumuladas sobre el total (80+60+80+60 = 280ms). */
+  @keyframes t-input-shake {
+    0% {
+      transform: translateX(0);
+      animation-timing-function: var(--shake-ease);
+    }
+    28.57% {
+      transform: translateX(var(--shake-distance));
+      animation-timing-function: var(--shake-ease);
+    }
+    57.14% {
+      transform: translateX(calc(var(--shake-distance) * -1));
+      animation-timing-function: var(--shake-ease);
+    }
+    78.57% {
+      transform: translateX(var(--shake-overshoot));
+      animation-timing-function: var(--shake-ease);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     notification-badge — transitions-dev-react-css/notification-badge/…
+     -------------------------------------------------------------------------- */
+  :root {
+    --badge-slide-dur: 260ms;
+    --badge-pop-dur: var(--motion-slower);
+    --badge-pop-close-dur: 180ms;
+    --badge-fade-dur: var(--motion-slow);
+    --badge-fade-close-dur: 180ms;
+    --badge-blur: var(--motion-blur-sm);
+    --badge-offset-x: -8.2px;
+    --badge-offset-y: 12.4px;
+    --badge-slide-ease: var(--ease-standard);
+    --badge-pop-ease: var(--ease-emphasized);
+    --badge-close-ease: var(--ease-exit);
+  }
+
+  @keyframes t-badge-slide-in {
+    from {
+      transform: translate(var(--badge-offset-x), var(--badge-offset-y));
+    }
+    to {
+      transform: translate(0, 0);
+    }
+  }
+  .t-badge {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .t-badge[data-open='true'] {
+    animation: t-badge-slide-in var(--badge-slide-dur) var(--badge-slide-ease);
+  }
+  .t-badge-dot {
+    display: block;
+    transform-origin: center;
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+    transition:
+      transform var(--badge-pop-dur) var(--badge-pop-ease),
+      opacity var(--badge-fade-dur) var(--badge-pop-ease),
+      filter var(--badge-pop-dur) var(--badge-pop-ease);
+    will-change: transform, opacity, filter;
+  }
+  .t-badge[data-open='false'] .t-badge-dot {
+    transform: scale(0);
+    opacity: 0;
+    filter: blur(var(--badge-blur));
+    transition:
+      transform var(--badge-pop-close-dur) var(--badge-close-ease),
+      opacity var(--badge-fade-close-dur) var(--badge-close-ease),
+      filter var(--badge-pop-close-dur) var(--badge-close-ease);
+  }
+
+  /* --------------------------------------------------------------------------
+     toggle — transitions-dev-react-css/toggle/toggle.txt
+     -------------------------------------------------------------------------- */
+  :root {
+    --toggle-dur: var(--motion-mid);
+    --toggle-travel: 18px;
+    --toggle-ov1: 1px;
+    --toggle-ov2: 0px;
+    --toggle-ease: var(--ease-emphasized);
+  }
+
+  .t-toggle-thumb {
+    translate: 0 0;
+    will-change: translate;
+  }
+  .t-toggle[data-on='true'] .t-toggle-thumb {
+    translate: var(--toggle-travel) 0;
+  }
+  .t-toggle.is-init[data-on='true'] .t-toggle-thumb {
+    animation: t-toggle-on var(--toggle-dur) var(--toggle-ease) both;
+  }
+  .t-toggle.is-init[data-on='false'] .t-toggle-thumb {
+    animation: t-toggle-off var(--toggle-dur) var(--toggle-ease) both;
+  }
+  @keyframes t-toggle-on {
+    0% {
+      translate: 0 0;
+    }
+    55% {
+      translate: calc(var(--toggle-travel) + var(--toggle-ov1)) 0;
+    }
+    80% {
+      translate: calc(var(--toggle-travel) - var(--toggle-ov2)) 0;
+    }
+    100% {
+      translate: var(--toggle-travel) 0;
+    }
+  }
+  @keyframes t-toggle-off {
+    0% {
+      translate: var(--toggle-travel) 0;
+    }
+    55% {
+      translate: calc(0px - var(--toggle-ov1)) 0;
+    }
+    80% {
+      translate: var(--toggle-ov2) 0;
+    }
+    100% {
+      translate: 0 0;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     checkbox-check — transitions-dev-react-css/checkbox-check/checkbox-check.txt
+     Uso: opción elegida en una predicción y confirmaciones de resolución.
+     -------------------------------------------------------------------------- */
+  :root {
+    --check-box: var(--motion-fast);
+    --check-draw: var(--motion-mid);
+    --check-delay: 0ms;
+    --check-uncheck: var(--motion-fast);
+    --check-ease: var(--ease-standard);
+  }
+
+  .t-check {
+    transition:
+      background-color var(--check-box) var(--check-ease),
+      border-color var(--check-box) var(--check-ease),
+      box-shadow var(--check-box) var(--check-ease);
+  }
+  .t-check svg path {
+    stroke-dasharray: var(--check-len, 16);
+    stroke-dashoffset: var(--check-len, 16);
+    transition: stroke-dashoffset var(--check-uncheck) var(--check-ease);
+  }
+  .t-check[data-checked='true'] svg path {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset var(--check-draw) var(--check-ease)
+      var(--check-delay);
+  }
+
+  /* --------------------------------------------------------------------------
+     tooltip — transitions-dev-react-css/tooltip/tooltip.txt
+     Uso: iconos sin etiqueta visible.
+     -------------------------------------------------------------------------- */
+  :root {
+    --tt-in-dur: var(--motion-fast);
+    --tt-out-dur: 50ms;
+    --tt-scale: 0.98;
+    --tt-delay: var(--motion-instant);
+    --tt-in-ease: ease-out;
+    --tt-out-ease: ease-out;
+  }
+
+  .t-tt-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  .t-tt {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translate(-50%, 0) scale(var(--tt-scale));
+    transform-origin: 50% 100%;
+    padding: 6px 10px;
+    border-radius: var(--r-sm);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: var(--step-micro);
+    white-space: nowrap;
+    box-shadow: var(--shadow-2);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 40;
+    transition:
+      opacity var(--tt-out-dur) var(--tt-out-ease),
+      transform var(--tt-out-dur) var(--tt-out-ease);
+  }
+  .t-tt-wrap:hover .t-tt,
+  .t-tt-trigger:focus-visible + .t-tt {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+    transition-duration: var(--tt-in-dur);
+    transition-timing-function: var(--tt-in-ease);
+    transition-delay: var(--tt-delay);
+  }
+
+  /* --------------------------------------------------------------------------
+     avatar-group-hover — transitions-dev-react-css/avatar-group-hover/…
+     -------------------------------------------------------------------------- */
+  :root {
+    --avatar-lift: -4px;
+    --avatar-dur: 320ms;
+    --avatar-scale: 1.05;
+    --avatar-falloff: 0.45;
+    --avatar-ease-in: var(--ease-standard);
+    --avatar-ease-out: cubic-bezier(0.34, 3.85, 0.64, 1);
+  }
+
+  .t-avatar {
+    transform-origin: center;
+    /* translateY antes de scale para que la escala no amplifique el desplazamiento. */
+    transform: translateY(var(--shift, 0px)) scale(var(--scale-active, 1));
+    transition: transform var(--avatar-dur) var(--avatar-ease-in);
+    will-change: transform;
+  }
+
+  /* --------------------------------------------------------------------------
+     plus-menu-morph — transitions-dev-react-css/plus-menu-morph/…
+     Uso: el botón "+" que se transforma en el menú de crear predicción.
+     -------------------------------------------------------------------------- */
+  :root {
+    --morph-open-dur: var(--motion-mid);
+    --morph-close-dur: var(--motion-base);
+    --morph-ease: cubic-bezier(0.34, 1.25, 0.64, 1);
+    --morph-close-ease: var(--ease-standard);
+    --morph-fade-dur: 200ms;
+    --morph-slide: var(--motion-shift-xl);
+    --morph-rotate: 45deg;
+    --morph-scale: var(--motion-scale-sm);
+    --morph-blur: var(--motion-blur-sm);
+  }
+
+  .t-morph-icon {
+    transition: transform var(--morph-open-dur) var(--morph-close-ease);
+  }
+  .t-morph[data-open='true'] .t-morph-icon {
+    transform: scale(var(--morph-scale)) rotate(var(--morph-rotate));
+  }
+
+  /* --------------------------------------------------------------------------
+     smoky-dissolve (adaptado) — transitions-dev-react-css/smoky-dissolve/…
+     La receta original disuelve con ruido sobre canvas. Acá se usa su idea —
+     desvanecer con blur creciente y una leve deriva hacia arriba — resuelto con
+     una animación compositable, porque el elemento que desaparece es una fila de
+     lista que tiene que seguir siendo anunciable y no puede quedar en un canvas.
+     -------------------------------------------------------------------------- */
+  :root {
+    --dissolve-dur: 520ms;
+    --dissolve-blur: 6px;
+    --dissolve-rise: 10px;
+    --dissolve-ease: var(--ease-exit);
+  }
+
+  .t-dissolve-out {
+    animation: t-dissolve var(--dissolve-dur) var(--dissolve-ease) both;
+    pointer-events: none;
+  }
+  @keyframes t-dissolve {
+    0% {
+      opacity: 1;
+      filter: blur(0);
+      transform: translateY(0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      filter: blur(var(--dissolve-blur));
+      transform: translateY(calc(var(--dissolve-rise) * -1)) scale(0.985);
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     confetti-burst — transitions-dev-react-css/confetti-burst/confetti-burst.txt
+     La simulación lee estos tokens en cada disparo (ver Confetti.tsx).
+     -------------------------------------------------------------------------- */
+  :root {
+    --confetti-count: 110;
+    --confetti-gravity: 1300;
+    --confetti-size: 8px;
+    --confetti-sway: 16;
+    --confetti-bounce: 0.3;
+    --confetti-hold: 1400ms;
+    --confetti-fade: 600ms;
+  }
+
+  /* --------------------------------------------------------------------------
+     Spinner. Es el único movimiento que sobrevive a prefers-reduced-motion: sin
+     él no habría forma de saber que algo está en curso. Se baja la velocidad en
+     lugar de frenarlo.
+     -------------------------------------------------------------------------- */
+  .cantado-spinner {
+    animation: t-spin 700ms linear infinite;
+  }
+  @keyframes t-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cantado-spinner {
+      animation-duration: 1800ms;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     Entradas de lista escalonadas (feed) — misma gramática que texts-reveal.
+     -------------------------------------------------------------------------- */
+  .t-item-in {
+    animation: t-item-in var(--motion-slow) var(--ease-standard) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+  @keyframes t-item-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--motion-shift-md));
+      filter: blur(var(--motion-blur-sm));
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     Reduced motion — una sola puerta para toda la biblioteca.
+     Se neutraliza el movimiento pero NUNCA la visibilidad: todo queda en su
+     estado final legible.
+     -------------------------------------------------------------------------- */
+  @media (prefers-reduced-motion: reduce) {
+    .t-stagger-line,
+    .t-text-swap,
+    .t-modal,
+    .t-sheet,
+    .t-scrim,
+    .t-dropdown,
+    .t-panel-slide,
+    .t-toast,
+    .t-tabs-pill,
+    .t-tab,
+    .t-resize,
+    .t-collapse,
+    .t-avatar,
+    .t-check,
+    .t-check svg path,
+    .t-tt,
+    .t-input,
+    .t-badge-dot,
+    .t-morph-icon {
+      transition: none !important;
+    }
+
+    .t-page-enter,
+    .t-item-in,
+    .t-digit-group .t-digit,
+    .t-success-check,
+    .t-success-check svg path,
+    .t-skel-in,
+    .t-skel-pulse > *,
+    .t-input.is-shaking,
+    .t-toggle-thumb,
+    .t-badge,
+    .t-dissolve-out {
+      animation: none !important;
+    }
+
+    .t-stagger-line {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+    .t-success-check {
+      opacity: 1;
+    }
+    .t-success-check svg path {
+      stroke-dashoffset: 0 !important;
+    }
+    .t-dissolve-out {
+      opacity: 0;
+    }
+  }
+
+}
