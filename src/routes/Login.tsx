@@ -1,13 +1,16 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, EnvelopeSimple } from '@phosphor-icons/react'
 import { useAuth } from '@/auth/useAuth'
+import { supabase } from '@/lib/supabase'
 import { emailSchema } from '@/lib/validation'
 import { friendlyError } from '@/lib/errors'
 import { Logo } from '@/components/Logo'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/Field'
 import { Reveal, RevealLine } from '@/components/ui/Reveal'
+import { Avatar } from '@/components/ui/Avatar'
+import { useToast } from '@/components/ui/toast-context'
 
 /** El isotipo de Google es una marca de terceros: colores oficiales, sin
  * retocar, y sólo como icono de un botón «Continuar con Google» — el uso que
@@ -36,11 +39,72 @@ function GoogleGlyph() {
 }
 
 /**
+ * Cuentas del seed local (`supabase/seed.sql`), para entrar sin pasar por
+ * mail ni por Google mientras se prueba en la propia máquina. La contraseña
+ * es siempre `cantado123` y sólo existe en el stack local — no hay login por
+ * contraseña ni acá ni en producción.
+ */
+const DEV_ACCOUNTS = [
+  { id: 'bauti', email: 'bauti@cantado.test', display_name: 'Bauti', avatar_seed: 'BA', accent: 0 },
+  { id: 'juan', email: 'juan@cantado.test', display_name: 'Juan', avatar_seed: 'JU', accent: 1 },
+  { id: 'agus', email: 'agus@cantado.test', display_name: 'Agus', avatar_seed: 'AG', accent: 2 },
+  { id: 'fran', email: 'fran@cantado.test', display_name: 'Fran', avatar_seed: 'FR', accent: 3 },
+  { id: 'lu', email: 'lu@cantado.test', display_name: 'Lu', avatar_seed: 'LU', accent: 4 },
+  { id: 'caro', email: 'caro@cantado.test', display_name: 'Caro', avatar_seed: 'CA', accent: 5 },
+] as const
+
+function DevQuickLogin({ next }: { next?: string }) {
+  const navigate = useNavigate()
+  const toast = useToast()
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const onPick = async (email: string): Promise<void> => {
+    setBusy(email)
+    const { error } = await supabase.auth.signInWithPassword({ email, password: 'cantado123' })
+    setBusy(null)
+    if (error) {
+      toast.show({
+        message: friendlyError(error, '¿Corriste `npm run db:reset`? Esa cuenta no existe.'),
+        tone: 'error',
+      })
+      return
+    }
+    navigate(next && next.startsWith('/') ? next : '/', { replace: true })
+  }
+
+  return (
+    <div className="mt-10 rounded-[var(--r-md)] border-2 border-dashed border-[var(--line-strong)] p-4">
+      <p className="type-meta text-[var(--ink-3)]">Sólo en local · seed de prueba</p>
+      <p className="mt-1.5 text-[0.8125rem] text-[var(--ink-2)]">
+        Entrá directo como alguien del seed, sin mail ni Google.
+      </p>
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {DEV_ACCOUNTS.map((account) => (
+          <li key={account.email}>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void onPick(account.email)}
+              className="flex min-h-[var(--tap)] items-center gap-2 rounded-[var(--r-pill)] border-2 border-[var(--line-strong)] bg-[var(--surface)] py-1 pl-1.5 pr-3.5 text-[0.8125rem] font-semibold text-[var(--ink)] transition-[background-color,box-shadow] duration-[var(--motion-fast)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+            >
+              <Avatar person={account} size="xs" />
+              {busy === account.email ? 'Entrando…' : account.display_name}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/**
  * Ingreso.
  *
  * Dos caminos, sin jerarquía forzada entre ellos: Google entra directo, y el
  * Magic Link no pide inventar ni recordar una contraseña para votar si Fran
- * llega tarde.
+ * llega tarde. En desarrollo se suma un tercero, sólo visible con `npm run
+ * dev` (`import.meta.env.DEV` se elimina del bundle de producción, así que
+ * esto no puede llegar a aparecer en la app real).
  */
 export function Login() {
   const { signInWithEmail, signInWithGoogle } = useAuth()
@@ -175,6 +239,8 @@ export function Login() {
                   Mandame el link
                 </Button>
               </form>
+
+              {import.meta.env.DEV && <DevQuickLogin next={next} />}
             </div>
           </>
         )}
