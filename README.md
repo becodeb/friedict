@@ -126,6 +126,16 @@ navegador**. Ahí sólo puede vivir la clave anónima, que está diseñada para
 exponerse y que sin RLS no sirve de nada. La `service_role` key no aparece en
 ninguna parte del código de la aplicación.
 
+### Google
+
+El ingreso admite Google además de Magic Link, principalmente para no
+depender de un proveedor de mail saliente en local. Las credenciales de OAuth
+NO van en `.env.local`: viven en `supabase/.env` (gitignored), que el CLI lee
+para resolver el `env(...)` de `supabase/config.toml`. `supabase/.env.example`
+tiene el paso a paso para conseguirlas en Google Cloud Console. Sin ese
+archivo, el botón de Google queda visible pero Supabase responde «provider is
+not enabled» al tocarlo — el resto de la app funciona igual.
+
 ---
 
 ## Comandos
@@ -167,7 +177,7 @@ supabase/
   config.toml                 configuración del stack local
 
 src/
-  auth/                       sesión y perfil (Magic Link)
+  auth/                       sesión y perfil (Google + Magic Link)
   components/
     ui/                       primitivos: Button, Sheet, Tabs, Toast, Avatar…
     prediction/               PredictionCard, VoteOption, ResolutionPanel…

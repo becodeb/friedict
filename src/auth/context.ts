@@ -11,6 +11,7 @@ export interface AuthState {
   /** Hay sesión pero todavía no completó el onboarding. */
   needsProfile: boolean
   signInWithEmail: (email: string, next?: string) => Promise<void>
+  signInWithGoogle: (next?: string) => Promise<void>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }

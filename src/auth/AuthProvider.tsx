@@ -8,10 +8,12 @@ import { AuthContext, type AuthState } from './context'
 /**
  * Sesión y perfil.
  *
- * Autenticación por Magic Link: no le pedimos a nadie que invente una
- * contraseña para votar si Fran llega tarde. El perfil (nombre visible y color)
- * se crea recién en el onboarding, así que puede haber sesión sin perfil: ese
- * es el estado `needsProfile`.
+ * Dos caminos de entrada: Magic Link (no le pedimos a nadie que invente una
+ * contraseña para votar si Fran llega tarde) y Google, que no depende de tener
+ * un proveedor de mail saliente configurado. El perfil (nombre visible y
+ * color) se crea recién en el onboarding, así que puede haber sesión sin
+ * perfil: ese es el estado `needsProfile`, y es el mismo sin importar por
+ * dónde entró la persona.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
@@ -81,6 +83,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }, [])
 
+  // OAuth redirige de verdad al proveedor: no hay nada que esperar acá
+  // adentro. La sesión llega después, cuando `/auth/callback` canjea el código
+  // y `onAuthStateChange` la levanta como cualquier otra.
+  const signInWithGoogle = useCallback(async (next?: string) => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: authRedirectTo(next) },
+    })
+    if (error) throw error
+  }, [])
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     setProfile(null)
@@ -100,10 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       needsProfile: Boolean(session?.user) && profile === null && !loading,
       signInWithEmail,
+      signInWithGoogle,
       signOut,
       refreshProfile,
     }),
-    [session, profile, loading, signInWithEmail, signOut, refreshProfile],
+    [session, profile, loading, signInWithEmail, signInWithGoogle, signOut, refreshProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

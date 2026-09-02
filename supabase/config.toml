@@ -330,6 +330,17 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+# Google: mientras no haya proveedor de mail (Resend) configurado en local,
+# es el único camino de ingreso que funciona sin depender del inbox de
+# Mailpit. Las credenciales viven en `supabase/.env` (gitignored) — ver
+# `supabase/.env.example`. Con el par vacío, el CLI no arranca este proveedor:
+# el resto del stack sigue funcionando igual y el botón de Google en la UI
+# devuelve el error de Supabase hasta que se completen client_id/secret.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+
 [auth.external.apple]
 enabled = false
 client_id = ""
