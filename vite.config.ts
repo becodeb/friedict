@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Cantado — predicciones entre amigos',
-        short_name: 'Cantado',
+        name: 'friedict — predicciones entre amigos',
+        short_name: 'friedict',
         description:
           'Predicciones privadas entre amigos. Elegí qué va a pasar y descubrí quién tenía razón.',
         lang: 'es-AR',
@@ -21,8 +21,8 @@ export default defineConfig({
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#f7f5f2',
-        theme_color: '#f7f5f2',
+        background_color: '#f1f0fa',
+        theme_color: '#f1f0fa',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },

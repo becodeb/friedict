@@ -107,10 +107,11 @@ export function GroupShell() {
 
       {offline && <OfflineBanner />}
 
+      {/* Cabecera opaca y con línea de tinta: la sombra dura de las tarjetas no
+          combina con un desenfoque, así que acá no lo hay. */}
       <header
         className={cn(
-          'sticky top-0 z-30 border-b border-[var(--line)]',
-          'bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur-md',
+          'sticky top-0 z-30 border-b-2 border-[var(--line-strong)] bg-[var(--bg)]',
           'pt-[var(--safe-t)]',
         )}
       >
@@ -119,7 +120,7 @@ export function GroupShell() {
             {group.data && groupId ? (
               <GroupSwitcher groupId={groupId} groupName={group.data.name} />
             ) : (
-              <Skeleton className="h-6 w-36" />
+              <Skeleton className="h-7 w-36" />
             )}
           </div>
 
@@ -127,8 +128,8 @@ export function GroupShell() {
             <NavLink
               to={`/g/${groupId}/miembros`}
               className={cn(
-                'hidden shrink-0 items-center rounded-[var(--r-sm)] px-1.5',
-                'min-h-[var(--tap)] hover:bg-[var(--surface-2)] sm:flex',
+                'hidden shrink-0 items-center rounded-[var(--r-pill)] px-2',
+                'min-h-[var(--tap)] hover:bg-[var(--bg-sunken)] sm:flex',
               )}
               aria-label={`Ver los ${members.data.length} integrantes`}
             >
@@ -183,12 +184,12 @@ export function GroupShell() {
                 {...props}
                 aria-label="Opciones del grupo"
                 className={cn(
-                  'grid size-[var(--tap)] shrink-0 place-items-center rounded-[var(--r-sm)]',
-                  'text-[var(--ink-3)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]',
+                  'grid size-[var(--tap)] shrink-0 place-items-center rounded-full',
+                  'text-[var(--ink)] hover:bg-[var(--bg-sunken)]',
                   'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
                 )}
               >
-                <DotsThree size={22} weight="bold" aria-hidden="true" />
+                <DotsThree size={24} weight="bold" aria-hidden="true" />
               </button>
             )}
           />
@@ -196,7 +197,7 @@ export function GroupShell() {
 
         {/* Navegación en desktop: la misma que abajo en mobile. */}
         <nav aria-label="Secciones del grupo" className="hidden sm:block">
-          <ul className="feed-column flex gap-1 pb-1">
+          <ul className="feed-column flex gap-2 pb-2.5">
             {destinations.map((destination) => (
               <li key={destination.to}>
                 <NavLink
@@ -204,29 +205,16 @@ export function GroupShell() {
                   end={destination.end}
                   className={({ isActive }) =>
                     cn(
-                      'relative inline-flex min-h-[var(--tap)] items-center rounded-[var(--r-sm)] px-2.5',
-                      'type-meta transition-colors duration-[var(--motion-fast)]',
-                      'motion-reduce:transition-none',
+                      'inline-flex min-h-[40px] items-center rounded-[var(--r-pill)] border-2 px-3.5',
+                      'text-[0.8125rem] font-semibold',
+                      'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
                       isActive
-                        ? 'text-[var(--ink)]'
-                        : 'text-[var(--ink-3)] hover:text-[var(--ink)]',
+                        ? 'border-[var(--line-strong)] bg-[var(--ink)] text-[var(--bg)]'
+                        : 'border-transparent text-[var(--ink-2)] hover:bg-[var(--bg-sunken)] hover:text-[var(--ink)]',
                     )
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {destination.label}
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          'absolute inset-x-2.5 bottom-1 h-[2px] rounded-full bg-[var(--accent)]',
-                          'transition-opacity duration-[var(--motion-base)]',
-                          'motion-reduce:transition-none',
-                          isActive ? 'opacity-100' : 'opacity-0',
-                        )}
-                      />
-                    </>
-                  )}
+                  {destination.label}
                 </NavLink>
               </li>
             ))}

@@ -1,4 +1,4 @@
-# Cantado
+# friedict
 
 **Predicciones privadas entre amigos.** Alguien pregunta qué va a pasar, el grupo se
 juega, y cuando la cosa se resuelve se ve quién tenía razón.
@@ -7,9 +7,9 @@ No hay dinero, saldo, premios ni apuestas de ningún tipo. Los puntos son sólo 
 mecanismo de juego: se ganan acertando, nunca se pierden y no valen nada fuera de
 la app.
 
-> El nombre viene de *«estaba cantado que llegaba tarde»*: eso que todos sabían
-> que iba a pasar. Es exactamente lo que hace el producto, y funciona como
-> reacción cuando se resuelve una predicción.
+> El nombre junta *friends* y *predict*: predicciones entre amigos. Y cuando una
+> se resuelve, la app dice lo que dice cualquier grupo: *«¡estaba cantado!»*,
+> eso que todos sabían que iba a pasar.
 
 ---
 
@@ -320,21 +320,37 @@ link como lo haría una persona.
 
 ## Diseño
 
-**Design Read** — aplicación social privada para amigos. Minimalismo editorial,
-tipografía fuerte, interacción táctil y motion expresivo. Divertida sin ser
-infantil, cuidada sin parecer una fintech.
+**Design Read: «Caramelo».** El grupo de WhatsApp hecho interfaz: stickers,
+colores de golosina y contornos gruesos que parecen impresos. Divertida sin
+ser infantil: lo que la mantiene adulta es el contorno de tinta y que la
+tipografía no sea redondeada.
 
-- **Un solo acento**: tomate. `L = 0.58` no es casual, es el punto donde el texto
-  blanco encima llega a 4.7:1 y cumple AA.
-- **Tipografía**: Geist y Geist Mono, self-hosted. El mono se usa para
-  metadatos, cuentas regresivas y cifras.
-- **El feed no son tarjetas.** Cada predicción es un bloque separado por una
-  línea de pelo sobre el fondo de la página, con un rail de color a la izquierda
-  que codifica el estado. Encajar cada una en un rectángulo con borde y sombra
-  —y adentro otro rectángulo por opción— es el apilado de cajas que hace que una
-  app se vea generada.
-- **El estado siempre se comunica por texto además de por color.** Quien no
-  distingue el ocre del tomate lee igual «En prueba» y «Abierta».
+- **Contorno de 2 px y sombra dura.** Todo lo que se toca —tarjetas, píldoras,
+  botones, campos, diálogos— lleva un borde de tinta y una sombra desplazada sin
+  desenfoque. Al apretar un botón se hunde sobre su sombra. Los tokens son
+  `--outline-w` y `--shadow-1/2/3`; las piezas compartidas (`.card-pop`,
+  `.opt-pill`, `.sticker`, `.burst`) viven en `src/styles/base.css`.
+- **Un color por estado, y siempre con texto.** Sol para *en prueba*, lima para
+  *abierta* y para la opción que pasó, cielo para *cerrada* y para las
+  evolutivas, tinta para *resuelta*, gris para lo que no juntó gente. Cuatro
+  golosinas es el máximo que aguanta sin volverse infantil. El estado es un
+  `Sticker` pegado sobre el borde de la tarjeta, con filete troquelado, y el
+  texto va siempre: quien no distingue el sol de la lima lee igual «En prueba»
+  y «Abierta».
+- **El chicle es tu voto y la acción.** Un solo acento (`--accent`, #FF5FA8)
+  para la opción que elegiste, el botón principal y el FAB. El texto sobre
+  cualquier golosina es siempre tinta oscura (`--on-candy`), también en modo
+  oscuro: las golosinas no cambian de tema, sólo cambian la tinta y las
+  superficies.
+- **Tipografía**: Bricolage Grotesque 800 para preguntas, títulos y cifras;
+  Instrument Sans para texto y controles. Las dos self-hosted vía fontsource.
+- **El umbral se cuenta con caritas.** Una carita por persona que ya se jugó y
+  un círculo punteado por cada una que falta. Sin iniciales: hasta el cierre
+  nadie sabe quién votó, y eso lo garantiza la base, no la interfaz.
+- **Resolver y rankear son festejo.** La explosión «¡Estaba cantado!» aparece
+  en la esquina de toda predicción resuelta, y los tres primeros del ranking
+  suben a un podio de golosina. El confeti sigue reservado para cuando
+  acertaste vos.
 - **Objetivo táctil de 44 px** en todo control, verificado por un test.
 
 ### Motion
@@ -349,7 +365,7 @@ duraciones, curvas, distancias y blurs apuntan a tokens centralizados en
 | `texts-reveal` | Encabezados, onboarding, estados vacíos |
 | `page-side-by-side` | Entrada al detalle de una predicción |
 | `card-resize` | Panel plegable de «Más opciones» |
-| `tabs-sliding` | Abiertas / En prueba / Cerradas |
+| `tabs-sliding` | Abiertas / En prueba / Cerradas: la píldora de tinta viaja entre pestañas |
 | `text-states-swap` | «En prueba» → «Abierta», contador de participación |
 | `number-pop-in` | Puntos del ranking y participantes |
 | `success-check` | Voto guardado, resultado confirmado |

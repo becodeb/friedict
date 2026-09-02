@@ -83,7 +83,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     ([key, session]) => {
       window.localStorage.setItem(key, JSON.stringify(session))
     },
-    ['cantado.auth', auth.session],
+    ['friedict.auth', auth.session],
   )
 
   await visit(page, `${label}-04-feed`, `/g/${GROUP}`)
@@ -115,14 +115,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     // Tema oscuro.
     await page.evaluate(() => {
       document.documentElement.dataset.theme = 'dark'
-      localStorage.setItem('cantado.theme', 'dark')
+      localStorage.setItem('friedict.theme', 'dark')
     })
     await visit(page, 'desktop-12-feed-oscuro', `/g/${GROUP}`)
 
     // Sheet de crear predicción abierto.
     await page.evaluate(() => {
       document.documentElement.dataset.theme = 'light'
-      localStorage.setItem('cantado.theme', 'light')
+      localStorage.setItem('friedict.theme', 'light')
     })
     await page.goto(`${APP}/g/${GROUP}`, { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: /nueva predicción/i }).first().click()

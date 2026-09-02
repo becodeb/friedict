@@ -2,20 +2,20 @@ import { useId } from 'react'
 import { cn, initials } from '@/lib/cn'
 
 /**
- * Elección de color de avatar. Ocho opciones, cero subida de fotos.
+ * Elección de color de avatar. Ocho golosinas, cero subida de fotos.
  *
  * Es un `radiogroup` real, así que las flechas del teclado funcionan solas y
  * cada color tiene nombre accesible: el color nunca es el único identificador.
  */
 const COLOR_NAMES = [
-  'tomate',
-  'verde',
-  'azul',
-  'mostaza',
-  'magenta',
-  'celeste',
-  'naranja',
-  'violeta',
+  'chicle',
+  'lima',
+  'cielo',
+  'sol',
+  'lila',
+  'durazno',
+  'menta',
+  'blanco',
 ] as const
 
 export function AvatarPicker({
@@ -34,7 +34,7 @@ export function AvatarPicker({
     <div>
       <div className="mb-2 flex items-center gap-3">
         <span
-          className="grid size-12 shrink-0 place-items-center rounded-full text-base font-semibold uppercase text-white"
+          className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-[var(--line-strong)] text-base font-bold uppercase text-[var(--on-candy)] shadow-[var(--shadow-1)]"
           style={{ background: `var(--avatar-${value})` }}
           aria-hidden="true"
         >
@@ -46,7 +46,7 @@ export function AvatarPicker({
       </div>
 
       <fieldset className="border-0 p-0">
-        <legend className="mb-1.5 text-[0.8125rem] font-medium text-[var(--ink-2)]">
+        <legend className="mb-1.5 text-[0.8125rem] font-semibold text-[var(--ink-2)]">
           Tu color
         </legend>
         <div className="flex flex-wrap gap-1">
@@ -58,7 +58,7 @@ export function AvatarPicker({
                 className={cn(
                   'relative grid size-[var(--tap)] cursor-pointer place-items-center rounded-full',
                   'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2',
-                  'has-[:focus-visible]:outline-[var(--accent)]',
+                  'has-[:focus-visible]:outline-[var(--ink)]',
                 )}
               >
                 {/* Transparente y del tamaño completo, no `sr-only`: así el
@@ -78,12 +78,10 @@ export function AvatarPicker({
                     // `pointer-events-none`: la muestra de color se pinta encima
                     // del input transparente, y sin esto sería ella la que
                     // recibiría el toque en lugar del control real.
-                    'pointer-events-none block size-7 rounded-full',
-                    'transition-transform duration-[var(--motion-base)]',
+                    'pointer-events-none block size-7 rounded-full border-2 border-[var(--line-strong)]',
+                    'transition-[transform,box-shadow] duration-[var(--motion-base)]',
                     'ease-[var(--ease-emphasized)] motion-reduce:transition-none',
-                    selected
-                      ? 'scale-100 ring-2 ring-[var(--ink)] ring-offset-2 ring-offset-[var(--bg)]'
-                      : 'scale-90 hover:scale-100',
+                    selected ? 'scale-100 shadow-[var(--shadow-1)]' : 'scale-90 hover:scale-100',
                   )}
                   style={{ background: `var(--avatar-${index})` }}
                   aria-hidden="true"

@@ -24,13 +24,13 @@ export const supabase = createClient<Database>(url, anonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    storageKey: 'cantado.auth',
+    storageKey: 'friedict.auth',
   },
   realtime: {
     params: { eventsPerSecond: 10 },
   },
   global: {
-    headers: { 'x-application-name': 'cantado' },
+    headers: { 'x-application-name': 'friedict' },
   },
 })
 

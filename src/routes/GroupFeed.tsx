@@ -120,7 +120,7 @@ export function GroupFeed() {
   return (
     <div className="feed-column pt-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="type-title text-[1.375rem]">¿Qué va a pasar?</h1>
+        <h1 className="type-title text-[1.5rem]">¿Qué va a pasar?</h1>
         {/* El envoltorio hace el `hidden`, no el botón: `hidden` y el
             `inline-flex` propio del Button son ambos utilidades de display y
             cuál gana depende del orden en la hoja, no del orden de las clases. */}
@@ -150,11 +150,13 @@ export function GroupFeed() {
         </div>
       )}
 
-      <div className="mt-4">
+      <div className="mt-2">
         {predictions.isLoading ? (
           <SkeletonFeed />
         ) : predictions.isError ? (
-          <ErrorState onRetry={() => void predictions.refetch()} />
+          <div className="mt-4">
+            <ErrorState onRetry={() => void predictions.refetch()} />
+          </div>
         ) : isEmpty ? (
           <EmptyState
             title="Todavía no hay nada acá"
@@ -188,7 +190,7 @@ export function GroupFeed() {
             }
           />
         ) : (
-          <ul>
+          <ul className="pb-2">
             {visible.map((prediction, index) => (
               <li
                 key={prediction.id}
@@ -219,14 +221,14 @@ export function GroupFeed() {
           onClick={() => setCreateOpen(true)}
           aria-label="Nueva predicción"
           className={cn(
-            'grid size-14 place-items-center rounded-full',
-            'bg-[var(--accent)] text-[var(--accent-fg)] shadow-[var(--shadow-3)]',
-            'active:scale-95 motion-reduce:active:scale-100',
-            'transition-transform duration-[var(--motion-fast)] ease-[var(--ease-standard)]',
-            'motion-reduce:transition-none',
+            'grid size-[60px] place-items-center rounded-full border-2 border-[var(--line-strong)]',
+            'bg-[var(--accent)] text-[var(--on-candy)] shadow-[var(--shadow-2)]',
+            'active:translate-x-[2px] active:translate-y-[2px] active:shadow-none',
+            'transition-[transform,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-standard)]',
+            'motion-reduce:transition-none motion-reduce:active:translate-x-0 motion-reduce:active:translate-y-0',
           )}
         >
-          <Plus size={24} weight="bold" aria-hidden="true" className="t-morph-icon" />
+          <Plus size={26} weight="bold" aria-hidden="true" className="t-morph-icon" />
         </button>
       </div>
 

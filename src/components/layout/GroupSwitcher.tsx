@@ -38,17 +38,17 @@ export function GroupSwitcher({
           className={cn(
             'flex min-h-[var(--tap)] max-w-[min(60vw,18rem)] items-center gap-1.5',
             '-ml-2 rounded-[var(--r-sm)] px-2 text-left',
-            'hover:bg-[var(--surface-2)]',
+            'hover:bg-[var(--bg-sunken)]',
             'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
           )}
         >
-          <span className="type-title truncate text-[1.0625rem]">{groupName}</span>
+          <span className="type-title truncate text-[1.25rem]">{groupName}</span>
           <CaretDown
-            size={13}
+            size={15}
             weight="bold"
             aria-hidden="true"
             className={cn(
-              'shrink-0 text-[var(--ink-3)]',
+              'shrink-0 text-[var(--ink)]',
               'transition-transform duration-[var(--motion-base)] ease-[var(--ease-standard)]',
               'motion-reduce:transition-none',
               props['aria-expanded'] && 'rotate-180',

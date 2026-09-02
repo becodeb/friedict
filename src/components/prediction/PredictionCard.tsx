@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, ArrowsClockwise, Repeat, Trophy } from '@phosphor-icons/react'
 import { cn } from '@/lib/cn'
 import {
-  STATUS_RAIL,
   canSeeResults,
   effectiveStatus,
   isRevealed,
@@ -15,6 +14,7 @@ import type { Prediction } from '@/lib/types'
 import { useCastVote } from '@/data/predictions'
 import { useToast } from '@/components/ui/toast-context'
 import { Countdown } from '@/components/ui/Countdown'
+import { Burst, Sticker } from '@/components/ui/Sticker'
 import { SuccessCheck } from '@/components/ui/SuccessCheck'
 import { PredictionStatusLabel } from './PredictionStatus'
 import { ParticipationThreshold } from './ParticipationThreshold'
@@ -23,12 +23,12 @@ import { VoteOption } from './VoteOption'
 /**
  * La tarjeta del feed.
  *
- * Decisión de diseño: NO es una tarjeta con caja. Es un bloque separado por una
- * línea de pelo sobre el fondo de la página, con un rail de color a la
- * izquierda que codifica el estado. Encajar cada predicción en un rectángulo
- * con borde y sombra —y adentro otro rectángulo por opción— es exactamente el
- * apilado de cajas que hace que una app se vea generada. Acá la jerarquía la
- * dan el espacio, el peso tipográfico y el rail.
+ * Una tarjeta blanca con contorno de tinta y sombra dura, y los stickers
+ * pegados sobre el borde superior: a la izquierda el estado, a la derecha lo
+ * que hace falta saber ahora (cuándo cierra, si es evolutiva, si la propuso
+ * el sistema). Cuando se resuelve, explota el «¡Estaba cantado!» en la
+ * esquina. La jerarquía la dan la pregunta en Bricolage y las píldoras de las
+ * opciones, no más cajas adentro de cajas.
  */
 export function PredictionCard({
   prediction,
@@ -93,54 +93,48 @@ export function PredictionCard({
   const qualified = status !== 'proposed'
   const isRecurring = prediction.voting_mode === 'recurring'
   const winnerId = prediction.resolved_option_id
+  const detailTo = `/g/${groupId}/p/${prediction.id}`
 
   return (
     <article
-      className="t-item-in relative border-t border-[var(--line)] py-5 pl-4"
+      className="t-item-in card-pop relative mt-7 px-4 pb-4 pt-6 sm:px-5"
       style={{ '--i': index } as React.CSSProperties}
     >
-      <span
-        className="status-rail"
-        style={{ '--rail': STATUS_RAIL[status] } as React.CSSProperties}
-        aria-hidden="true"
-      />
-
-      {/* Meta */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <PredictionStatusLabel status={status} />
+      {/* Stickers pegados sobre el borde. */}
+      <div className="pointer-events-none absolute inset-x-3 -top-[15px] flex items-start justify-between gap-2 sm:inset-x-4">
+        <PredictionStatusLabel status={status} cut tilt={-4} />
 
         {!revealed && status !== 'expired' && (
-          <Countdown
-            target={prediction.closes_at}
-            prefix="cierra en"
-            className="type-meta text-[var(--ink-3)]"
-          />
-        )}
-        {status === 'resolved' && prediction.resolved_at && (
-          <span className="type-meta text-[var(--ink-3)]">
-            {formatRelative(prediction.resolved_at)}
-          </span>
-        )}
-
-        {isRecurring && (
-          <span className="type-meta inline-flex items-center gap-1 text-[var(--ink-3)]">
-            <Repeat size={12} weight="bold" aria-hidden="true" />
-            evolutiva
-          </span>
-        )}
-        {prediction.is_default && (
-          <span className="type-meta text-[var(--ink-3)]">del sistema</span>
+          <Sticker cut tilt={3}>
+            <Countdown target={prediction.closes_at} prefix="cierra en" />
+          </Sticker>
         )}
       </div>
 
+      {status === 'resolved' && <Burst className="-right-3 -top-8 sm:-right-4" />}
+
+      {/* Lo que describe a la predicción y no a su momento va adentro, sobre la
+          pregunta: en el borde sólo caben dos stickers sin taparse en mobile. */}
+      {(isRecurring || prediction.is_default) && (
+        <div className="mb-2.5 flex flex-wrap gap-1.5">
+          {isRecurring && (
+            <Sticker tone="sky" tilt={-1}>
+              <Repeat size={11} weight="bold" aria-hidden="true" />
+              evolutiva
+            </Sticker>
+          )}
+          {prediction.is_default && <Sticker tilt={1}>del sistema</Sticker>}
+        </div>
+      )}
+
       {/* Pregunta.
           El `py-3 -my-1.5` no es capricho: un título de una sola línea mide
-          22px de alto y quedaría muy por debajo del objetivo táctil de 44px.
+          24px de alto y quedaría muy por debajo del objetivo táctil de 44px.
           El padding agranda el área de toque y el margen negativo devuelve el
           espacio, así que el ritmo vertical no cambia. */}
-      <h3 className="mt-1">
+      <h3 className={cn('mt-1', status === 'resolved' && 'pr-16')}>
         <Link
-          to={`/g/${groupId}/p/${prediction.id}`}
+          to={detailTo}
           className={cn(
             'type-question block rounded-[var(--r-xs)] py-3 -my-1.5 text-[var(--ink)]',
             'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
@@ -152,7 +146,7 @@ export function PredictionCard({
       </h3>
 
       {prediction.description && (
-        <p className="mt-1.5 text-[0.875rem] leading-snug text-[var(--ink-2)]">
+        <p className="mt-2 text-[0.875rem] leading-snug text-[var(--ink-2)]">
           {prediction.description}
         </p>
       )}
@@ -161,7 +155,7 @@ export function PredictionCard({
       <div
         role="radiogroup"
         aria-label={`Opciones de: ${prediction.title}`}
-        className="mt-3.5 space-y-1.5"
+        className="mt-4 space-y-2"
       >
         {prediction.options.map((option) => (
           <VoteOption
@@ -179,7 +173,7 @@ export function PredictionCard({
       </div>
 
       {/* Pie contextual */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="mt-3.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           {status === 'proposed' ? (
             <ParticipationThreshold
@@ -195,18 +189,28 @@ export function PredictionCard({
             <p className="text-[0.8125rem] text-[var(--ink-2)]">
               Se cerraron las predicciones.{' '}
               <Link
-                to={`/g/${groupId}/p/${prediction.id}`}
-                className="font-medium text-[var(--accent-ink)] underline underline-offset-2"
+                to={detailTo}
+                className="font-semibold text-[var(--accent-ink)] underline underline-offset-2"
               >
                 {status === 'resolving' ? 'Confirmar resultado' : 'Resolver resultado'}
               </Link>
             </p>
           ) : status === 'resolved' ? (
             <p className="inline-flex items-center gap-1.5 text-[0.8125rem] text-[var(--ink-2)]">
-              <Trophy size={14} weight="fill" className="text-[var(--status-resolved)]" aria-hidden="true" />
+              <Trophy
+                size={14}
+                weight="fill"
+                className="text-[var(--status-resolved-ink)]"
+                aria-hidden="true"
+              />
+              {prediction.resolved_at && (
+                <span className="text-[var(--ink-3)]">
+                  {formatRelative(prediction.resolved_at)} ·{' '}
+                </span>
+              )}
               <Link
-                to={`/g/${groupId}/p/${prediction.id}`}
-                className="font-medium text-[var(--ink)] underline underline-offset-2"
+                to={detailTo}
+                className="font-semibold text-[var(--ink)] underline underline-offset-2"
               >
                 Ver qué pasó
               </Link>
@@ -221,7 +225,7 @@ export function PredictionCard({
               <SuccessCheck
                 show={savedAt > 0}
                 size={14}
-                className="text-[var(--status-resolved)]"
+                className="text-[var(--status-active-ink)]"
               />
               {savedAt > 0 ? 'Tu voto quedó guardado' : 'Podés cambiarlo hasta el cierre'}
             </p>
@@ -237,11 +241,14 @@ export function PredictionCard({
         </div>
 
         <Link
-          to={`/g/${groupId}/p/${prediction.id}`}
+          to={detailTo}
           className={cn(
-            'inline-flex min-h-[var(--tap)] shrink-0 items-center gap-1 rounded-[var(--r-xs)]',
-            'type-meta text-[var(--ink-3)] hover:text-[var(--ink)]',
-            'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
+            'inline-flex min-h-[var(--tap)] shrink-0 items-center gap-1 rounded-[var(--r-pill)]',
+            'border-2 border-[var(--line-strong)] bg-[var(--surface)] px-3.5',
+            'text-[0.8125rem] font-semibold text-[var(--ink)]',
+            'transition-[background-color,transform,box-shadow] duration-[var(--motion-fast)]',
+            'hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]',
+            'motion-reduce:transition-none',
           )}
         >
           Detalle

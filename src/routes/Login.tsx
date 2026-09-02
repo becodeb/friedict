@@ -50,8 +50,11 @@ export function Login() {
   return (
     <div className="flex min-h-[100dvh] flex-col">
       <header className="feed-column flex items-center justify-between pt-5">
-        <Link to="/" className="inline-flex items-center gap-2 text-[var(--ink-3)]">
-          <ArrowLeft size={16} weight="bold" aria-hidden="true" />
+        <Link
+          to="/"
+          className="grid size-[var(--tap)] -ml-3 place-items-center rounded-full text-[var(--ink)] hover:bg-[var(--bg-sunken)]"
+        >
+          <ArrowLeft size={18} weight="bold" aria-hidden="true" />
           <span className="sr-only">Volver a la portada</span>
         </Link>
         <Logo size="sm" />
@@ -62,17 +65,17 @@ export function Login() {
           <Reveal key="sent">
             <RevealLine index={1}>
               <span
-                className="grid size-11 place-items-center rounded-full bg-[var(--accent-wash)] text-[var(--accent-ink)]"
+                className="grid size-12 place-items-center rounded-full border-2 border-[var(--line-strong)] bg-[var(--accent)] text-[var(--on-candy)] shadow-[var(--shadow-1)]"
                 aria-hidden="true"
               >
-                <EnvelopeSimple size={20} weight="bold" />
+                <EnvelopeSimple size={22} weight="bold" />
               </span>
             </RevealLine>
             <RevealLine as="h1" index={2} className="type-title mt-5 max-w-[16ch]">
               Te mandamos un link
             </RevealLine>
             <RevealLine as="p" index={3} className="mt-3 max-w-[38ch] text-[var(--ink-2)]">
-              Está en <strong className="font-medium text-[var(--ink)]">{sentTo}</strong>.
+              Está en <strong className="font-semibold text-[var(--ink)]">{sentTo}</strong>.
               Abrilo desde este mismo dispositivo y entrás directo.
             </RevealLine>
             <RevealLine index={4} className="mt-6">
@@ -110,7 +113,7 @@ export function Login() {
                   if (error) setError(undefined)
                 }}
               />
-              <Button type="submit" size="lg" block className="mt-4" loading={sending}>
+              <Button type="submit" size="lg" block className="mt-5" loading={sending}>
                 Mandame el link
               </Button>
             </form>

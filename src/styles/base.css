@@ -5,7 +5,7 @@
 
 @layer base {
   /* ==========================================================================
-     Cantado — base
+     friedict — base
      ========================================================================== */
 
   *,
@@ -33,7 +33,7 @@
     color: var(--ink);
     font-family: var(--font-sans);
     font-size: var(--step-body);
-    line-height: 1.55;
+    line-height: 1.5;
     font-synthesis-weight: none;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -57,13 +57,16 @@
     margin: 0;
   }
 
+  /* Los títulos hablan en Bricolage Grotesque, pesada y apretada. Es la voz
+     de las preguntas y de las cifras; todo lo demás va en Instrument Sans. */
   h1,
   h2,
   h3,
   h4 {
-    font-weight: 560;
-    letter-spacing: -0.02em;
-    line-height: 1.12;
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.06;
     text-wrap: balance;
   }
 
@@ -103,10 +106,11 @@
   }
 
   /* --------------------------------------------------------------------------
-     Foco: siempre visible, nunca sólo por color.
+     Foco: siempre visible, nunca sólo por color. Va en tinta y no en chicle
+     porque el chicle es el relleno de varios controles.
      -------------------------------------------------------------------------- */
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 3px solid var(--ink);
     outline-offset: 2px;
     border-radius: var(--r-xs);
   }
@@ -120,32 +124,35 @@
      Tipografía de la app
      -------------------------------------------------------------------------- */
   .type-display {
+    font-family: var(--font-display);
     font-size: var(--step-display);
-    font-weight: 580;
-    letter-spacing: -0.038em;
-    line-height: 0.98;
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
   }
 
   .type-title {
+    font-family: var(--font-display);
     font-size: var(--step-title);
-    font-weight: 560;
-    letter-spacing: -0.025em;
-    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
   }
 
   .type-question {
+    font-family: var(--font-display);
     font-size: var(--step-question);
-    font-weight: 520;
-    letter-spacing: -0.018em;
-    line-height: 1.28;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
     text-wrap: balance;
   }
 
   .type-meta {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: var(--step-meta);
-    font-weight: 500;
-    letter-spacing: 0.06em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
@@ -158,6 +165,146 @@
 
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* --------------------------------------------------------------------------
+     Piezas del sistema. Van acá y no en cada componente porque son la gramática
+     de toda la app: la misma tarjeta, la misma píldora y el mismo sticker se
+     usan en el feed, el detalle, los diálogos y la portada.
+     -------------------------------------------------------------------------- */
+
+  /* Tarjeta: superficie, contorno de tinta y sombra dura. */
+  .card-pop {
+    background: var(--surface);
+    border: var(--outline-w) solid var(--line-strong);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-2);
+  }
+
+  /* Píldora de opción: la fila votable. Quien la use decide relleno y sombra. */
+  .opt-pill {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    min-height: 46px;
+    padding: 0.375rem 0.875rem 0.375rem 0.75rem;
+    border: var(--outline-w) solid var(--line-strong);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    color: var(--ink);
+    text-align: left;
+    overflow: hidden;
+  }
+
+  /* Sticker: etiqueta de estado. Contorno, relleno de golosina y texto siempre. */
+  .sticker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.35rem 0.7rem;
+    border: var(--outline-w) solid var(--line-strong);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--step-meta);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .sticker[data-tone='sun'] {
+    background: var(--candy-sun);
+    color: var(--on-candy);
+  }
+  .sticker[data-tone='lime'] {
+    background: var(--candy-lime);
+    color: var(--on-candy);
+  }
+  .sticker[data-tone='sky'] {
+    background: var(--candy-sky);
+    color: var(--on-candy);
+  }
+  .sticker[data-tone='pink'] {
+    background: var(--accent);
+    color: var(--on-candy);
+  }
+  .sticker[data-tone='ink'] {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .sticker[data-tone='grey'] {
+    background: var(--status-expired);
+    color: var(--ink);
+  }
+  /* Troquelado: un filete del color de la superficie alrededor, para cuando el
+     sticker va pegado sobre el borde de una tarjeta. */
+  .sticker[data-cut] {
+    box-shadow: 0 0 0 3px var(--surface);
+  }
+
+  /* Explosión «¡Estaba cantado!»: dos capas, la de atrás en tinta hace de
+     contorno porque clip-path se come el border. */
+  .burst {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 92px;
+    height: 92px;
+    padding: 0 8px;
+    background: var(--accent);
+    color: var(--on-candy);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 0.8125rem;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    text-align: center;
+    clip-path: polygon(
+      100% 50%,
+      86.96% 65.31%,
+      85.36% 85.36%,
+      65.31% 86.96%,
+      50% 100%,
+      34.69% 86.96%,
+      14.64% 85.36%,
+      13.04% 65.31%,
+      0% 50%,
+      13.04% 34.69%,
+      14.64% 14.64%,
+      34.69% 13.04%,
+      50% 0%,
+      65.31% 13.04%,
+      85.36% 14.64%,
+      86.96% 34.69%
+    );
+  }
+  .burst-back {
+    position: absolute;
+    inset: -3px;
+    background: var(--ink);
+    clip-path: polygon(
+      100% 50%,
+      86.96% 65.31%,
+      85.36% 85.36%,
+      65.31% 86.96%,
+      50% 100%,
+      34.69% 86.96%,
+      14.64% 85.36%,
+      13.04% 65.31%,
+      0% 50%,
+      13.04% 34.69%,
+      14.64% 14.64%,
+      34.69% 13.04%,
+      50% 0%,
+      65.31% 13.04%,
+      85.36% 14.64%,
+      86.96% 34.69%
+    );
   }
 
   /* --------------------------------------------------------------------------
@@ -197,7 +344,7 @@
   @media (pointer: fine) {
     * {
       scrollbar-width: thin;
-      scrollbar-color: var(--line-strong) transparent;
+      scrollbar-color: var(--line) transparent;
     }
   }
 
@@ -220,17 +367,6 @@
     padding-inline: var(--gutter);
   }
 
-  /* Rail de estado: la línea fina a la izquierda de cada predicción.
-     Comunica el estado por posición + color + etiqueta, nunca sólo por color. */
-  .status-rail {
-    position: absolute;
-    inset-block: 1.1rem;
-    inset-inline-start: 0;
-    width: 2px;
-    border-radius: 0 2px 2px 0;
-    background: var(--rail, var(--line-strong));
-  }
-
   .hairline-top {
     border-top: 1px solid var(--line);
   }
@@ -240,5 +376,4 @@
   .reserve {
     visibility: hidden;
   }
-
 }

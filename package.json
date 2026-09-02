@@ -1,5 +1,5 @@
 {
-  "name": "cantado",
+  "name": "friedict",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -27,8 +27,8 @@
     "db:types": "supabase gen types typescript --local --schema public > src/lib/database.types.ts"
   },
   "dependencies": {
-    "@fontsource-variable/geist": "^5.2.8",
-    "@fontsource-variable/geist-mono": "^5.2.8",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/instrument-sans": "^5.3.0",
     "@hookform/resolvers": "^5.2.2",
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.86.0",

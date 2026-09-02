@@ -7,13 +7,30 @@ import { TextSwap } from '@/components/ui/TextSwap'
  * El indicador de "En prueba".
  *
  * Es el mecanismo más particular del producto, así que tiene su propio
- * lenguaje: puntos llenos por cada persona que ya participó, vacíos por las que
- * faltan, y una frase que cambia según cuánto falta.
+ * lenguaje: una carita por cada persona que ya se jugó y un círculo punteado
+ * con un signo de pregunta por cada una que falta. Las caritas no tienen
+ * iniciales a propósito: hasta el cierre nadie sabe quién votó, y eso lo
+ * garantiza la base, no esta pantalla.
  *
  * Cuando llega la última persona, el texto pasa por `text-states-swap` y el
  * número por `number-pop-in`. Ese momento —"Listo, esta predicción queda"— es
  * de los pocos que merecen motion propio.
  */
+function Face() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="5.5" cy="6.2" r="1.15" fill="currentColor" />
+      <circle cx="10.5" cy="6.2" r="1.15" fill="currentColor" />
+      <path
+        d="M5 10c1.3 1.7 4.7 1.7 6 0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function ParticipationThreshold({
   participantCount,
   minimumParticipants,
@@ -34,29 +51,35 @@ export function ParticipationThreshold({
       : `Faltan ${missing} personas para que siga`
 
   return (
-    <div className={cn('flex flex-wrap items-center gap-x-2.5 gap-y-1', className)}>
-      <span className="flex items-center gap-1" aria-hidden="true">
-        {Array.from({ length: minimumParticipants }, (_, i) => (
-          <span
-            key={i}
-            className={cn(
-              'size-[7px] rounded-full',
-              'transition-[background-color,transform] duration-[var(--motion-base)]',
-              'ease-[var(--ease-emphasized)] motion-reduce:transition-none',
-              i < participantCount
-                ? qualified
-                  ? 'scale-100 bg-[var(--accent)]'
-                  : 'scale-100 bg-[var(--status-testing)]'
-                : 'scale-90 bg-[var(--line-strong)]',
-            )}
-          />
-        ))}
+    <div className={cn('flex flex-wrap items-center gap-x-2.5 gap-y-1.5', className)}>
+      <span className="flex items-center -space-x-1.5" aria-hidden="true">
+        {Array.from({ length: minimumParticipants }, (_, i) => {
+          const filled = i < participantCount
+          return (
+            <span
+              key={i}
+              className={cn(
+                'grid size-7 place-items-center rounded-full border-2 ring-2 ring-[var(--surface)]',
+                'transition-[background-color,transform] duration-[var(--motion-base)]',
+                'ease-[var(--ease-emphasized)] motion-reduce:transition-none',
+                filled
+                  ? cn(
+                      'scale-100 border-[var(--line-strong)] text-[var(--on-candy)]',
+                      qualified ? 'bg-[var(--status-active)]' : 'bg-[var(--status-testing)]',
+                    )
+                  : 'scale-90 border-dashed border-[var(--ink-3)] bg-[var(--surface)] text-[0.75rem] font-bold text-[var(--ink-3)]',
+              )}
+            >
+              {filled ? <Face /> : '?'}
+            </span>
+          )
+        })}
       </span>
 
       <span
         className={cn(
           'type-meta',
-          qualified ? 'text-[var(--accent-ink)]' : 'text-[var(--ink-2)]',
+          qualified ? 'text-[var(--status-active-ink)]' : 'text-[var(--ink-2)]',
         )}
       >
         {/* La versión animada es decorativa; el dato se anuncia una sola vez,
@@ -73,7 +96,7 @@ export function ParticipationThreshold({
       <span
         className={cn(
           'text-[0.8125rem]',
-          qualified ? 'font-medium text-[var(--accent-ink)]' : 'text-[var(--ink-3)]',
+          qualified ? 'font-semibold text-[var(--status-active-ink)]' : 'text-[var(--ink-3)]',
         )}
       >
         <TextSwap value={message} />

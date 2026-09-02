@@ -9,7 +9,7 @@ export function Spinner({
 }) {
   return (
     <svg
-      className={cn('cantado-spinner', className)}
+      className={cn('friedict-spinner', className)}
       width={size}
       height={size}
       viewBox="0 0 24 24"

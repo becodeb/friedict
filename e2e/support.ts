@@ -50,7 +50,7 @@ export async function signInAs(page: Page, email: string): Promise<string> {
     ([key, session]) => {
       window.localStorage.setItem(key as string, JSON.stringify(session))
     },
-    ['cantado.auth', data.session] as const,
+    ['friedict.auth', data.session] as const,
   )
 
   return data.user!.id
@@ -59,7 +59,7 @@ export async function signInAs(page: Page, email: string): Promise<string> {
 /** Fija el tema para que las capturas de fallo sean comparables. */
 export async function useLightTheme(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    window.localStorage.setItem('cantado.theme', 'light')
+    window.localStorage.setItem('friedict.theme', 'light')
   })
 }
 

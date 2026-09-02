@@ -1,101 +1,121 @@
 /* ==========================================================================
-   Cantado — tokens de diseño
+   friedict — tokens de diseño
    --------------------------------------------------------------------------
-   Design Read: aplicación social privada para amigos. Minimalismo editorial,
-   tipografía fuerte, interacción táctil y motion expresivo. Divertida sin ser
-   infantil, cuidada sin parecer una fintech.
+   Design Read: «Caramelo». El grupo de WhatsApp hecho interfaz: stickers,
+   colores de golosina y contornos gruesos que parecen impresos. Divertida sin
+   ser infantil: lo que la mantiene adulta es el contorno de tinta y que la
+   tipografía no sea redondeada.
 
-   Un solo color de acento (tomate) en toda la app. Los colores de las series
-   del gráfico son datos, no marca, y viven en --series-*.
+   Reglas que no se rompen:
+     · Un contorno de 2 px en tinta y una sombra dura —sin desenfoque— en todo
+       lo que se toca: tarjetas, píldoras, botones, campos, diálogos.
+     · Cada estado tiene un color de golosina propio y SIEMPRE texto al lado.
+       Cuatro colores de estado es el máximo; el quinto la vuelve infantil.
+     · El texto sobre un relleno de golosina es siempre tinta oscura
+       (--on-candy), también en modo oscuro: las golosinas no cambian de tema.
    ========================================================================== */
 
 :root {
   color-scheme: light;
 
   /* --- Superficies ------------------------------------------------------ */
-  --bg: oklch(0.976 0.005 85); /* blanco roto cálido */
-  --bg-sunken: oklch(0.955 0.006 85);
-  --surface: oklch(1 0 0);
-  --surface-2: oklch(0.962 0.005 85);
+  --bg: #f1f0fa; /* lavanda pálida */
+  --bg-sunken: #e4e2f1; /* pistas, esqueletos, cajas de aviso */
+  --surface: #ffffff;
+  --surface-2: #f6f5fb; /* hover sobre superficie */
 
   /* --- Tinta ------------------------------------------------------------ */
-  --ink: oklch(0.22 0.012 60); /* 15:1 sobre --bg */
-  --ink-2: oklch(0.45 0.012 60); /* 7:1  — texto secundario */
-  --ink-3: oklch(0.55 0.01 60); /* 4.7:1 — metadatos */
+  --ink: #17172b; /* 16:1 sobre --bg */
+  --ink-2: #474763; /* 8:1 — texto secundario */
+  --ink-3: #66667f; /* 5:1 — metadatos */
 
   /* --- Líneas ----------------------------------------------------------- */
-  --line: oklch(0.9 0.006 80);
-  --line-strong: oklch(0.84 0.008 80);
+  --line: #dcdaeb; /* separadores finos de listas */
+  --line-strong: var(--ink); /* EL contorno de 2 px */
 
-  /* --- Acento: tomate --------------------------------------------------- */
-  /* L=0.58 no es casual: es el punto donde el texto blanco encima llega a
-     4.7:1 y cumple AA. --accent-hi es más brillante y sólo se usa en gráficos
-     y rails, nunca debajo de texto. */
-  --accent: oklch(0.58 0.19 30);
-  --accent-hover: oklch(0.53 0.19 30);
-  --accent-hi: oklch(0.66 0.19 33);
-  --accent-fg: oklch(0.99 0 0);
-  --accent-ink: oklch(0.5 0.17 31); /* acento legible como texto sobre --bg */
-  --accent-wash: oklch(0.955 0.028 40);
-  --accent-line: oklch(0.86 0.07 35);
+  /* --- Golosinas -------------------------------------------------------- */
+  --candy-pink: #ff5fa8; /* chicle */
+  --candy-lime: #c6f249;
+  --candy-sun: #ffd43b;
+  --candy-sky: #74c0ff;
+  --candy-lilac: #c9b8ff;
+  --candy-peach: #ffb48a;
+  --candy-mint: #7fe3c8;
+  --on-candy: #17172b; /* texto sobre cualquier golosina, en ambos temas */
+
+  /* --- Acento: chicle --------------------------------------------------- */
+  --accent: var(--candy-pink);
+  --accent-hover: #ff4a9d;
+  --accent-hi: var(--candy-pink);
+  --accent-fg: var(--on-candy); /* tinta sobre chicle: 6.5:1 */
+  --accent-ink: #b5106d; /* chicle legible como texto sobre --bg: 5.6:1 */
+  --accent-wash: #ffe4f0;
+  --accent-line: var(--ink);
 
   /* --- Estados de una predicción ---------------------------------------- */
-  --status-testing: oklch(0.58 0.11 72); /* En prueba — ocre */
-  --status-testing-wash: oklch(0.955 0.03 82);
-  --status-active: var(--accent);
-  --status-closed: oklch(0.48 0.03 250);
-  --status-resolved: oklch(0.48 0.1 158);
-  --status-resolved-wash: oklch(0.955 0.035 160);
-  --status-expired: oklch(0.62 0.008 60);
-  --status-cancelled: oklch(0.62 0.008 60);
+  --status-testing: var(--candy-sun); /* En prueba */
+  --status-testing-ink: #7a5b00;
+  --status-testing-wash: #fff3c4;
+  --status-active: var(--candy-lime); /* Abierta */
+  --status-active-ink: #4b7300;
+  --status-closed: var(--candy-sky); /* Cerrada / Resolviendo */
+  --status-closed-ink: #175f9e;
+  --status-resolved: var(--ink); /* Resuelta: sticker de tinta */
+  --status-resolved-ink: #4b7300; /* «acertó», «pasó», íconos de logro */
+  --status-resolved-wash: var(--candy-lime); /* la opción que pasó */
+  --status-expired: #c9c7dc;
+  --status-cancelled: #c9c7dc;
 
-  --danger: oklch(0.52 0.19 27);
-  --danger-wash: oklch(0.955 0.03 27);
+  --danger: #cf1f4b;
+  --danger-wash: #ffe0e8;
 
   /* --- Paleta de avatares (profiles.accent 0-7) ------------------------- */
-  --avatar-0: oklch(0.62 0.16 30);
-  --avatar-1: oklch(0.6 0.12 150);
-  --avatar-2: oklch(0.58 0.13 255);
-  --avatar-3: oklch(0.65 0.13 75);
-  --avatar-4: oklch(0.58 0.15 330);
-  --avatar-5: oklch(0.6 0.1 200);
-  --avatar-6: oklch(0.62 0.14 55);
-  --avatar-7: oklch(0.55 0.11 285);
+  --avatar-0: var(--candy-pink);
+  --avatar-1: var(--candy-lime);
+  --avatar-2: var(--candy-sky);
+  --avatar-3: var(--candy-sun);
+  --avatar-4: var(--candy-lilac);
+  --avatar-5: var(--candy-peach);
+  --avatar-6: var(--candy-mint);
+  --avatar-7: #ffffff;
 
-  /* --- Series de datos (gráfico de evolución) --------------------------- */
-  --series-0: oklch(0.58 0.19 30);
-  --series-1: oklch(0.52 0.11 230);
-  --series-2: oklch(0.58 0.11 155);
-  --series-3: oklch(0.62 0.13 72);
-  --series-4: oklch(0.52 0.13 320);
-  --series-5: oklch(0.5 0.08 200);
+  /* --- Series de datos (gráfico de evolución, confeti) ------------------ */
+  /* Versiones más profundas de las golosinas: una línea de 3 px en lima pura
+     no se lee sobre blanco. */
+  --series-0: #ff3d97;
+  --series-1: #2e8fe6;
+  --series-2: #7ab800;
+  --series-3: #e8a900;
+  --series-4: #8b63ff;
+  --series-5: #17172b;
 
-  /* --- Radios: escala corta y deliberada -------------------------------- */
-  --r-xs: 4px;
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 18px;
+  /* --- Radios: píldoras y esquinas generosas ---------------------------- */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 24px;
   --r-pill: 999px;
 
-  /* --- Sombras teñidas, nunca negro puro -------------------------------- */
-  --shadow-1: 0 1px 2px oklch(0.3 0.02 60 / 0.05);
-  --shadow-2:
-    0 1px 2px oklch(0.3 0.02 60 / 0.06), 0 8px 24px -14px oklch(0.3 0.02 60 / 0.22);
-  --shadow-3:
-    0 2px 6px oklch(0.3 0.02 60 / 0.07), 0 28px 60px -28px oklch(0.3 0.02 60 / 0.3);
+  /* --- Sombras duras, sin desenfoque. Parecen impresas. ----------------- */
+  --outline-w: 2px;
+  --shadow-1: 3px 3px 0 var(--ink);
+  --shadow-2: 4px 4px 0 var(--ink);
+  --shadow-3: 6px 6px 0 var(--ink);
 
   /* --- Tipografía ------------------------------------------------------- */
   --font-sans:
-    'Geist Variable', 'Geist', ui-sans-serif, system-ui, -apple-system,
-    'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+    'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui,
+    -apple-system, 'Segoe UI', sans-serif;
+  --font-display:
+    'Bricolage Grotesque Variable', 'Bricolage Grotesque', var(--font-sans);
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  --step-display: clamp(2.5rem, 9vw, 4rem);
-  --step-title: clamp(1.5rem, 5vw, 1.875rem);
-  --step-question: clamp(1.0625rem, 4vw, 1.3125rem);
+  --step-display: clamp(2.75rem, 10vw, 4.5rem);
+  --step-title: clamp(1.5rem, 5vw, 1.9rem);
+  --step-question: clamp(1.1875rem, 4.4vw, 1.4375rem);
   --step-body: 0.9375rem;
-  --step-meta: 0.75rem;
-  --step-micro: 0.6875rem;
+  --step-meta: 0.6875rem;
+  --step-micro: 0.75rem;
 
   /* --- Layout ----------------------------------------------------------- */
   --feed-width: 34rem;
@@ -103,62 +123,49 @@
   --tap: 44px; /* objetivo táctil mínimo */
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
-  --bottom-nav-h: 60px;
+  --bottom-nav-h: 64px;
 }
 
+/* Modo oscuro: la tinta se vuelve clara y con ella los contornos y las sombras
+   duras. Las golosinas no cambian, y el texto sobre ellas sigue siendo oscuro. */
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: oklch(0.18 0.008 60);
-  --bg-sunken: oklch(0.155 0.008 60);
-  --surface: oklch(0.215 0.008 60);
-  --surface-2: oklch(0.25 0.008 60);
+  --bg: #14142a;
+  --bg-sunken: #0e0e21;
+  --surface: #1d1d38;
+  --surface-2: #26264a;
 
-  --ink: oklch(0.95 0.006 85);
-  --ink-2: oklch(0.76 0.008 85);
-  --ink-3: oklch(0.63 0.008 85);
+  --ink: #f4f2ff;
+  --ink-2: #c6c3e2;
+  --ink-3: #9d9ac0;
 
-  --line: oklch(0.3 0.008 70);
-  --line-strong: oklch(0.4 0.008 70);
+  --line: #30305a;
+  --line-strong: var(--ink);
 
-  --accent: oklch(0.68 0.175 33);
-  --accent-hover: oklch(0.73 0.175 33);
-  --accent-hi: oklch(0.72 0.18 35);
-  --accent-fg: oklch(0.17 0.012 40);
-  --accent-ink: oklch(0.75 0.16 33);
-  --accent-wash: oklch(0.28 0.055 33);
-  --accent-line: oklch(0.38 0.08 33);
+  --accent-hover: #ff77b6;
+  --accent-ink: #ff8ac2;
+  --accent-wash: #3b1f31;
 
-  --status-testing: oklch(0.78 0.12 78);
-  --status-testing-wash: oklch(0.29 0.045 78);
-  --status-closed: oklch(0.7 0.04 250);
-  --status-resolved: oklch(0.74 0.13 158);
-  --status-resolved-wash: oklch(0.28 0.05 160);
-  --status-expired: oklch(0.5 0.008 60);
-  --status-cancelled: oklch(0.5 0.008 60);
+  --status-testing-ink: #ffd43b;
+  --status-testing-wash: #3a3115;
+  --status-active-ink: #c6f249;
+  --status-closed-ink: #74c0ff;
+  --status-resolved-ink: #c6f249;
+  --status-expired: #4a4a72;
+  --status-cancelled: #4a4a72;
 
-  --danger: oklch(0.7 0.17 27);
-  --danger-wash: oklch(0.29 0.06 27);
+  --danger: #ff6b8e;
+  --danger-wash: #3d1a27;
 
-  --avatar-0: oklch(0.72 0.15 30);
-  --avatar-1: oklch(0.72 0.12 150);
-  --avatar-2: oklch(0.7 0.12 255);
-  --avatar-3: oklch(0.76 0.13 75);
-  --avatar-4: oklch(0.7 0.14 330);
-  --avatar-5: oklch(0.72 0.1 200);
-  --avatar-6: oklch(0.74 0.13 55);
-  --avatar-7: oklch(0.68 0.11 285);
+  --avatar-7: #f4f2ff;
 
-  --series-0: oklch(0.7 0.17 33);
-  --series-1: oklch(0.68 0.11 230);
-  --series-2: oklch(0.72 0.11 155);
-  --series-3: oklch(0.76 0.12 72);
-  --series-4: oklch(0.68 0.13 320);
-  --series-5: oklch(0.68 0.08 200);
-
-  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.3);
-  --shadow-2: 0 1px 2px oklch(0 0 0 / 0.35), 0 8px 24px -14px oklch(0 0 0 / 0.6);
-  --shadow-3: 0 2px 6px oklch(0 0 0 / 0.4), 0 28px 60px -28px oklch(0 0 0 / 0.7);
+  --series-0: #ff5fa8;
+  --series-1: #74c0ff;
+  --series-2: #c6f249;
+  --series-3: #ffd43b;
+  --series-4: #c9b8ff;
+  --series-5: #f4f2ff;
 }
 
 /* --------------------------------------------------------------------------
@@ -179,6 +186,15 @@
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
 
+  --color-candy-pink: var(--candy-pink);
+  --color-candy-lime: var(--candy-lime);
+  --color-candy-sun: var(--candy-sun);
+  --color-candy-sky: var(--candy-sky);
+  --color-candy-lilac: var(--candy-lilac);
+  --color-candy-peach: var(--candy-peach);
+  --color-candy-mint: var(--candy-mint);
+  --color-on-candy: var(--on-candy);
+
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-hi: var(--accent-hi);
@@ -188,15 +204,21 @@
   --color-accent-line: var(--accent-line);
 
   --color-testing: var(--status-testing);
+  --color-testing-ink: var(--status-testing-ink);
   --color-testing-wash: var(--status-testing-wash);
+  --color-active: var(--status-active);
+  --color-active-ink: var(--status-active-ink);
   --color-closed: var(--status-closed);
+  --color-closed-ink: var(--status-closed-ink);
   --color-resolved: var(--status-resolved);
+  --color-resolved-ink: var(--status-resolved-ink);
   --color-resolved-wash: var(--status-resolved-wash);
   --color-expired: var(--status-expired);
   --color-danger: var(--danger);
   --color-danger-wash: var(--danger-wash);
 
   --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
   --font-mono: var(--font-mono);
 
   --radius-xs: var(--r-xs);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useFieldArray, useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CaretDown, Plus, Sparkle, X } from '@phosphor-icons/react'
 import { cn } from '@/lib/cn'
@@ -74,14 +74,14 @@ export function CreatePredictionSheet({
   })
 
   const { control, register, handleSubmit, setValue, reset, formState } = form
-  const optionsArray = useFieldArray({
-    control,
-    // Un array de strings no tiene id propio: RHF necesita el cast.
-    name: 'options' as never,
-  })
 
   // `useWatch` en vez de `form.watch()`: el segundo devuelve una función nueva
   // en cada render y el compilador de React no puede memoizar el componente.
+  //
+  // Las opciones son un array de strings y `useFieldArray` sólo soporta arrays
+  // de objetos (con uno plano devuelve `fields` vacío y no se dibuja ningún
+  // campo). Se observa el array y se lo edita entero con `setValue`.
+  const options = useWatch({ control, name: 'options' }) ?? []
   const optionType = useWatch({ control, name: 'optionType' })
   const votingMode = useWatch({ control, name: 'votingMode' })
   const allowNewOptions = useWatch({ control, name: 'allowNewOptions' })
@@ -215,18 +215,18 @@ export function CreatePredictionSheet({
         />
 
         {optionType === 'members' ? (
-          <p className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[0.875rem] text-[var(--ink-2)]">
+          <p className="rounded-[var(--r-md)] bg-[var(--bg-sunken)] px-3.5 py-3 text-[0.875rem] text-[var(--ink-2)]">
             Cada integrante del grupo va a ser una opción. Ideal para
             «¿quién llega último?».
           </p>
         ) : (
           <div>
-            <span className="mb-1.5 block text-[0.8125rem] font-medium text-[var(--ink-2)]">
+            <span className="mb-1.5 block text-[0.8125rem] font-semibold text-[var(--ink-2)]">
               Opciones
             </span>
-            <ul className="space-y-1.5">
-              {optionsArray.fields.map((field, index) => (
-                <li key={field.id} className="flex items-start gap-1.5">
+            <ul className="space-y-2">
+              {options.map((_, index) => (
+                <li key={index} className="flex items-start gap-1.5">
                   <TextField
                     label={`Opción ${index + 1}`}
                     hideLabel
@@ -235,14 +235,20 @@ export function CreatePredictionSheet({
                     autoComplete="off"
                     {...register(`options.${index}` as const)}
                   />
-                  {optionsArray.fields.length > 2 && (
+                  {options.length > 2 && (
                     <button
                       type="button"
-                      onClick={() => optionsArray.remove(index)}
+                      onClick={() =>
+                        setValue(
+                          'options',
+                          options.filter((_, i) => i !== index),
+                          { shouldValidate: true },
+                        )
+                      }
                       aria-label={`Quitar opción ${index + 1}`}
                       className={cn(
-                        'grid size-[var(--tap)] shrink-0 place-items-center rounded-[var(--r-sm)]',
-                        'text-[var(--ink-3)] hover:bg-[var(--surface-2)] hover:text-[var(--danger)]',
+                        'grid size-[var(--tap)] shrink-0 place-items-center rounded-full',
+                        'text-[var(--ink-3)] hover:bg-[var(--danger-wash)] hover:text-[var(--danger)]',
                         'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
                       )}
                     >
@@ -254,18 +260,18 @@ export function CreatePredictionSheet({
             </ul>
 
             {formState.errors.options && (
-              <p className="mt-1.5 type-micro font-medium text-[var(--danger)]">
+              <p className="mt-1.5 type-micro font-semibold text-[var(--danger)]">
                 {formState.errors.options.message ??
                   formState.errors.options.root?.message}
               </p>
             )}
 
-            {optionsArray.fields.length < 12 && (
+            {options.length < 12 && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="mt-2"
-                onClick={() => optionsArray.append('' as never)}
+                onClick={() => setValue('options', [...options, ''])}
                 iconLeft={<Plus size={15} weight="bold" aria-hidden="true" />}
               >
                 Agregar opción
@@ -310,7 +316,7 @@ export function CreatePredictionSheet({
             aria-expanded={advanced}
             className={cn(
               'flex min-h-[var(--tap)] w-full items-center justify-between gap-2',
-              'border-t border-[var(--line)] pt-4 text-left type-meta text-[var(--ink-3)]',
+              'border-t-2 border-[var(--line)] pt-4 text-left type-meta text-[var(--ink-2)]',
               'hover:text-[var(--ink)]',
               'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
             )}
@@ -362,12 +368,12 @@ export function CreatePredictionSheet({
 
       {/* Propuestas del sistema: matan el estado vacío sin obligar a nada. */}
       {templates.data && templates.data.length > 0 && (
-        <section className="mt-7 border-t border-[var(--line)] pt-5">
-          <h3 className="type-meta inline-flex items-center gap-1.5 text-[var(--ink-3)]">
+        <section className="mt-7 border-t-2 border-[var(--line)] pt-5">
+          <h3 className="type-meta inline-flex items-center gap-1.5 text-[var(--ink-2)]">
             <Sparkle size={13} weight="fill" aria-hidden="true" />
             O usá una propuesta lista
           </h3>
-          <ul className="mt-3 flex flex-wrap gap-1.5">
+          <ul className="mt-3 flex flex-wrap gap-2">
             {templates.data.slice(0, 6).map((template) => (
               <li key={template.id}>
                 <button
@@ -375,10 +381,10 @@ export function CreatePredictionSheet({
                   disabled={createFromTemplate.isPending}
                   onClick={() => applyTemplate(template.id)}
                   className={cn(
-                    'min-h-[var(--tap)] rounded-[var(--r-sm)] border border-[var(--line-strong)]',
-                    'px-3 text-left text-[0.8125rem] text-[var(--ink-2)]',
-                    'hover:border-[var(--ink-3)] hover:text-[var(--ink)]',
-                    'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
+                    'min-h-[var(--tap)] rounded-[var(--r-pill)] border-2 border-[var(--line-strong)]',
+                    'bg-[var(--surface)] px-3.5 text-left text-[0.8125rem] font-medium text-[var(--ink)]',
+                    'hover:bg-[var(--candy-sun)] hover:text-[var(--on-candy)] hover:shadow-[var(--shadow-1)]',
+                    'transition-[background-color,box-shadow] duration-[var(--motion-fast)] motion-reduce:transition-none',
                     'disabled:cursor-not-allowed disabled:opacity-60',
                   )}
                 >

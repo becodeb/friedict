@@ -70,10 +70,7 @@ export function ResolutionPanel({
     const required = current.required_confirmations
 
     return (
-      <section
-        aria-labelledby="resolucion-titulo"
-        className="rounded-[var(--r-md)] border border-[var(--line-strong)] bg-[var(--surface)] p-4"
-      >
+      <section aria-labelledby="resolucion-titulo" className="card-pop p-5">
         <h2
           id="resolucion-titulo"
           className="type-meta inline-flex items-center gap-1.5 text-[var(--ink-3)]"
@@ -83,22 +80,27 @@ export function ResolutionPanel({
         </h2>
 
         <p className="type-question mt-2.5">{proposedOption?.label ?? 'Opción'}</p>
-        <p className="mt-1 type-micro text-[var(--ink-3)]">
+        <p className="mt-1.5 type-micro text-[var(--ink-3)]">
           Lo propusieron {formatRelative(current.created_at)}. Faltan{' '}
           {Math.max(0, required - agreeCount)} de {required} confirmaciones.
         </p>
 
         {isProposer ? (
-          <p className="mt-4 rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[0.875rem] text-[var(--ink-2)]">
+          <p className="mt-4 rounded-[var(--r-md)] bg-[var(--bg-sunken)] px-3.5 py-3 text-[0.875rem] text-[var(--ink-2)]">
             Lo propusiste vos, así que ahora esperá a que lo confirme el grupo.
           </p>
         ) : myConfirmation ? (
           <p className="mt-4 inline-flex items-center gap-2 text-[0.875rem] text-[var(--ink-2)]">
-            <Check size={16} weight="bold" className="text-[var(--status-resolved)]" aria-hidden="true" />
+            <Check
+              size={16}
+              weight="bold"
+              className="text-[var(--status-resolved-ink)]"
+              aria-hidden="true"
+            />
             Ya dijiste que {myConfirmation.agrees ? 'estás de acuerdo' : 'no estás de acuerdo'}.
           </p>
         ) : (
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2.5">
             <Button
               loading={confirm.isPending}
               iconLeft={<Check size={16} weight="bold" aria-hidden="true" />}
@@ -157,7 +159,7 @@ export function ResolutionPanel({
   // --- Cerrada, sin propuesta abierta --------------------------------------
   if (!canPropose && !wasRejected) {
     return (
-      <p className="rounded-[var(--r-md)] bg-[var(--surface-2)] px-4 py-3.5 text-[0.875rem] text-[var(--ink-2)]">
+      <p className="rounded-[var(--r-md)] bg-[var(--bg-sunken)] px-4 py-3.5 text-[0.875rem] text-[var(--ink-2)]">
         Se cerraron las predicciones. Falta que quien la creó —o alguien que
         administre el grupo— proponga el resultado.
       </p>
@@ -165,11 +167,8 @@ export function ResolutionPanel({
   }
 
   return (
-    <section
-      aria-labelledby="proponer-titulo"
-      className="rounded-[var(--r-md)] border border-[var(--line-strong)] bg-[var(--surface)] p-4"
-    >
-      <h2 id="proponer-titulo" className="type-title text-[1.0625rem]">
+    <section aria-labelledby="proponer-titulo" className="card-pop p-5">
+      <h2 id="proponer-titulo" className="type-title text-[1.25rem]">
         Resolver resultado
       </h2>
       <p className="mt-1.5 text-[0.875rem] text-[var(--ink-2)]">
@@ -178,41 +177,44 @@ export function ResolutionPanel({
           : 'Elegí qué pasó. Después lo tienen que confirmar otras dos personas.'}
       </p>
 
-      <div role="radiogroup" aria-label="Qué pasó" className="mt-3.5 space-y-1.5">
-        {prediction.options.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            role="radio"
-            aria-checked={picked === option.id}
-            onClick={() => setPicked(option.id)}
-            className={cn(
-              'flex min-h-[48px] w-full items-center gap-3 rounded-[var(--r-sm)] border px-3 py-2 text-left',
-              'transition-[border-color,background-color] duration-[var(--motion-fast)]',
-              'ease-[var(--ease-standard)] motion-reduce:transition-none',
-              picked === option.id
-                ? 'border-[var(--accent)] bg-[var(--accent-wash)]'
-                : 'border-[var(--line-strong)] hover:border-[var(--ink-3)]',
-            )}
-          >
-            <span
-              aria-hidden="true"
+      <div role="radiogroup" aria-label="Qué pasó" className="mt-4 space-y-2">
+        {prediction.options.map((option) => {
+          const isPicked = picked === option.id
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={isPicked}
+              onClick={() => setPicked(option.id)}
               className={cn(
-                'grid size-5 shrink-0 place-items-center rounded-full border-2',
-                picked === option.id
-                  ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]'
-                  : 'border-[var(--line-strong)] text-transparent',
+                'opt-pill',
+                'transition-[background-color,box-shadow,transform] duration-[var(--motion-fast)]',
+                'ease-[var(--ease-standard)] motion-reduce:transition-none',
+                isPicked
+                  ? 'bg-[var(--accent)] text-[var(--on-candy)] shadow-[var(--shadow-1)]'
+                  : 'hover:bg-[var(--surface-2)]',
               )}
             >
-              <Check size={12} weight="bold" />
-            </span>
-            <span className="text-[0.9375rem]">{option.label}</span>
-          </button>
-        ))}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'grid size-[18px] shrink-0 place-items-center rounded-full border-2 border-[var(--line-strong)]',
+                  isPicked ? 'bg-[var(--ink)] text-[var(--bg)]' : 'text-transparent',
+                )}
+              >
+                <Check size={11} weight="bold" />
+              </span>
+              <span className={cn('text-[0.9375rem]', isPicked ? 'font-semibold' : 'font-medium')}>
+                {option.label}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       <Button
-        className="mt-4"
+        className="mt-5"
         disabled={!picked}
         loading={propose.isPending}
         onClick={() => {

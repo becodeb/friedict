@@ -17,7 +17,9 @@ import {
  * lo que hace que no moleste. La clase `.is-open` se pone en el frame siguiente
  * al montaje para que la transición tenga desde dónde arrancar.
  *
- * `aria-live="polite"` en la región: los avisos se anuncian sin interrumpir.
+ * Es un sticker grande: contorno de tinta, sombra dura y un ícono de color
+ * según el tono. `aria-live="polite"` en la región: los avisos se anuncian sin
+ * interrumpir.
  */
 const ICONS = {
   neutral: Info,
@@ -39,23 +41,23 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
       ref={ref}
       className={cn(
         't-toast pointer-events-auto flex items-start gap-2.5',
-        'rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)]',
-        'px-3.5 py-3 shadow-[var(--shadow-3)]',
+        'rounded-[var(--r-md)] border-2 border-[var(--line-strong)] bg-[var(--surface)]',
+        'px-3.5 py-3 shadow-[var(--shadow-2)]',
         open && 'is-open',
       )}
     >
       <Icon
-        size={18}
+        size={19}
         weight="fill"
         className={cn(
           'mt-px shrink-0',
-          item.tone === 'success' && 'text-[var(--status-resolved)]',
+          item.tone === 'success' && 'text-[var(--status-resolved-ink)]',
           item.tone === 'error' && 'text-[var(--danger)]',
           item.tone === 'neutral' && 'text-[var(--ink-3)]',
         )}
         aria-hidden="true"
       />
-      <p className="min-w-0 flex-1 text-[0.875rem] leading-snug text-[var(--ink)]">
+      <p className="min-w-0 flex-1 text-[0.875rem] font-medium leading-snug text-[var(--ink)]">
         {item.message}
       </p>
       {item.action && (
@@ -65,7 +67,7 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
             item.action?.onClick()
             onDismiss()
           }}
-          className="shrink-0 text-[0.8125rem] font-medium text-[var(--accent-ink)] underline underline-offset-2"
+          className="shrink-0 text-[0.8125rem] font-semibold text-[var(--accent-ink)] underline underline-offset-2"
         >
           {item.action.label}
         </button>
@@ -116,7 +118,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           aria-relevant="additions"
           className={cn(
             'pointer-events-none fixed inset-x-0 z-[60] mx-auto flex w-full max-w-[26rem]',
-            'flex-col gap-2 px-4',
+            'flex-col gap-2.5 px-4',
             // Por encima de la nav inferior en mobile.
             'bottom-[calc(var(--bottom-nav-h)+var(--safe-b)+0.75rem)]',
             'sm:bottom-5',

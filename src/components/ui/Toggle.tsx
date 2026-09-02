@@ -7,6 +7,9 @@ import { cn } from '@/lib/cn'
  * El thumb viaja con un overshoot de 1px al 55% del recorrido, que es lo que le
  * da la sensación física. `.is-init` se agrega recién después del primer render
  * para que un toggle que arranca encendido no se anime al montar.
+ *
+ * La pista tiene contorno de tinta y se rellena de chicle al encender; el
+ * thumb es una bolita de tinta.
  */
 export function Toggle({
   checked,
@@ -40,7 +43,7 @@ export function Toggle({
       )}
     >
       <span className="min-w-0">
-        <span className="block text-[0.9375rem] text-[var(--ink)]">{label}</span>
+        <span className="block text-[0.9375rem] font-medium text-[var(--ink)]">{label}</span>
         {description && (
           <span className="mt-0.5 block type-micro text-[var(--ink-3)]">
             {description}
@@ -60,17 +63,17 @@ export function Toggle({
         <span
           data-on={checked}
           className={cn(
-            't-toggle block h-[26px] w-[46px] rounded-full p-[3px]',
+            't-toggle block h-[28px] w-[50px] rounded-full border-2 border-[var(--line-strong)] p-[2px]',
             'transition-colors duration-[var(--motion-base)] ease-[var(--ease-standard)]',
             'motion-reduce:transition-none',
             'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
-            'peer-focus-visible:outline-[var(--accent)]',
-            checked ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]',
+            'peer-focus-visible:outline-[var(--ink)]',
+            checked ? 'bg-[var(--accent)]' : 'bg-[var(--surface)]',
             initialised && 'is-init',
           )}
           aria-hidden="true"
         >
-          <span className="t-toggle-thumb block size-5 rounded-full bg-white shadow-[var(--shadow-1)]" />
+          <span className="t-toggle-thumb block size-5 rounded-full bg-[var(--ink)]" />
         </span>
       </span>
     </label>

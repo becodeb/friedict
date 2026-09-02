@@ -148,7 +148,7 @@ export function History() {
                       <CheckCircle
                         size={18}
                         weight="fill"
-                        className="mt-0.5 shrink-0 text-[var(--status-resolved)]"
+                        className="mt-0.5 shrink-0 text-[var(--status-resolved-ink)]"
                         aria-hidden="true"
                       />
                     )}

@@ -18,7 +18,7 @@ const context = await browser.newContext({ viewport: { width: Number(process.arg
 const page = await context.newPage()
 await page.addInitScript(
   ([key, session]) => window.localStorage.setItem(key, JSON.stringify(session)),
-  ['cantado.auth', data.session],
+  ['friedict.auth', data.session],
 )
 
 for (const path of [

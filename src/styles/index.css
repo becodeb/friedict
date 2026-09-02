@@ -1,9 +1,11 @@
 @import 'tailwindcss';
 
 /* Fuentes self-hosted: nada de pedidos a un CDN externo, y el service worker
-   las precachea junto al app shell. */
-@import '@fontsource-variable/geist/index.css';
-@import '@fontsource-variable/geist-mono/index.css';
+   las precachea junto al app shell. Bricolage Grotesque entra con su eje de
+   tamaño óptico además del peso, para que los títulos grandes usen el corte
+   de display y las cifras chicas el de texto. */
+@import '@fontsource-variable/bricolage-grotesque/opsz.css';
+@import '@fontsource-variable/instrument-sans/index.css';
 
 @import './tokens.css';
 @import './motion.css';

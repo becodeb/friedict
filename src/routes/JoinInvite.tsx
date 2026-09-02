@@ -163,7 +163,7 @@ export function JoinInvite() {
 
       <footer className="feed-column py-6">
         <Link to="/" className="type-micro text-[var(--ink-3)] underline underline-offset-2">
-          ¿Qué es Cantado?
+          ¿Qué es friedict?
         </Link>
       </footer>
     </div>

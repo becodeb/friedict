@@ -1,5 +1,5 @@
 /**
- * Cálculo de puntos de Cantado.
+ * Cálculo de puntos de friedict.
  *
  * Los puntos son sólo gamificación: no se apuestan, no se pierden, no se
  * compran y no valen plata. Sólo se ganan acertando.

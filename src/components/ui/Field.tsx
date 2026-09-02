@@ -40,12 +40,16 @@ function useShakeOnError(error: string | undefined) {
   return ref
 }
 
+/* Campo: contorno de tinta de 2 px y esquinas generosas. Al enfocarlo se
+   levanta sobre una sombra dura, además del anillo de foco. */
 const CONTROL_BASE = cn(
-  't-input w-full rounded-[var(--r-sm)] border bg-[var(--surface)]',
-  'px-3.5 py-3 text-[0.9375rem] text-[var(--ink)]',
+  't-input w-full rounded-[var(--r-md)] border-2 bg-[var(--surface)]',
+  'px-4 py-3 text-[0.9375rem] text-[var(--ink)]',
   'placeholder:text-[var(--ink-3)]',
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]',
-  'disabled:cursor-not-allowed disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]',
+  'transition-[box-shadow,border-color] duration-[var(--motion-fast)] motion-reduce:transition-none',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]',
+  'focus-visible:shadow-[var(--shadow-1)]',
+  'disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[var(--bg-sunken)] disabled:text-[var(--ink-3)]',
 )
 
 interface FieldShellProps {
@@ -79,7 +83,7 @@ export function FieldShell({
         <label
           htmlFor={inputId}
           className={cn(
-            'text-[0.8125rem] font-medium text-[var(--ink-2)]',
+            'text-[0.8125rem] font-semibold text-[var(--ink-2)]',
             hideLabel && 'sr-only',
           )}
         >
@@ -98,7 +102,7 @@ export function FieldShell({
       {error && (
         <p
           id={errorId}
-          className="mt-1.5 type-micro font-medium text-[var(--danger)]"
+          className="mt-1.5 type-micro font-semibold text-[var(--danger)]"
         >
           {error}
         </p>
@@ -141,9 +145,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
             aria-describedby={describedBy}
             className={cn(
               CONTROL_BASE,
-              error
-                ? 'border-[var(--danger)]'
-                : 'border-[var(--line-strong)] hover:border-[var(--ink-3)]',
+              error ? 'border-[var(--danger)]' : 'border-[var(--line-strong)]',
               className,
             )}
           />
@@ -181,9 +183,7 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
             className={cn(
               CONTROL_BASE,
               'min-h-[5.5rem] resize-y',
-              error
-                ? 'border-[var(--danger)]'
-                : 'border-[var(--line-strong)] hover:border-[var(--ink-3)]',
+              error ? 'border-[var(--danger)]' : 'border-[var(--line-strong)]',
               className,
             )}
           />

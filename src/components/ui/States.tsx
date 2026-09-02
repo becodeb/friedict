@@ -32,7 +32,7 @@ export function EmptyState({
           <RevealLine
             as="p"
             index={2}
-            className="mt-2.5 max-w-[36ch] text-[var(--ink-2)]"
+            className="mt-3 max-w-[36ch] text-[var(--ink-2)]"
           >
             {body}
           </RevealLine>
@@ -58,14 +58,8 @@ export function ErrorState({
   onRetry?: () => void
 }) {
   return (
-    <div
-      role="alert"
-      className={cn(
-        'rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)]',
-        'px-5 py-6',
-      )}
-    >
-      <h2 className="type-title text-[1.125rem]">{title}</h2>
+    <div role="alert" className="card-pop px-5 py-6">
+      <h2 className="type-title text-[1.25rem]">{title}</h2>
       <p className="mt-2 text-[0.9375rem] text-[var(--ink-2)]">{body}</p>
       {onRetry && (
         <Button
@@ -87,8 +81,8 @@ export function OfflineBanner() {
     <div
       role="status"
       className={cn(
-        'flex items-center justify-center gap-2 border-b border-[var(--line)]',
-        'bg-[var(--surface-2)] px-4 py-2 type-micro text-[var(--ink-2)]',
+        'flex items-center justify-center gap-2 border-b-2 border-[var(--line-strong)]',
+        'bg-[var(--status-testing)] px-4 py-2 type-micro font-semibold text-[var(--on-candy)]',
       )}
     >
       <WifiSlash size={14} weight="bold" aria-hidden="true" />

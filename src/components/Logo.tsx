@@ -3,13 +3,10 @@ import { cn } from '@/lib/cn'
 /**
  * Marca.
  *
- * "Cantado" es lo que se dice en el Río de la Plata cuando algo era
- * absolutamente previsible: *estaba cantado que llegaba tarde*. Es exactamente
- * lo que hace la app, y funciona además como reacción cuando se resuelve una
- * predicción.
- *
- * El logotipo es la palabra en minúscula con un punto en acento. Nada de
- * isotipos genéricos ni SVG improvisados.
+ * «friedict» es friends + predict: predicciones entre amigos. El logotipo es
+ * la palabra en Bricolage Grotesque, pesada y apretada, con un sticker redondo
+ * de chicle al final: la misma bolita con contorno que marca tu voto en las
+ * opciones. Nada de isotipos genéricos ni SVG improvisados.
  */
 export function Logo({
   className,
@@ -21,15 +18,18 @@ export function Logo({
   return (
     <span
       className={cn(
-        'inline-flex select-none items-baseline font-semibold tracking-[-0.045em]',
-        size === 'sm' && 'text-[1.0625rem]',
-        size === 'md' && 'text-[1.375rem]',
-        size === 'lg' && 'text-[2rem]',
+        'inline-flex select-none items-center gap-[0.18em] font-display font-extrabold tracking-[-0.045em]',
+        size === 'sm' && 'text-[1.125rem]',
+        size === 'md' && 'text-[1.5rem]',
+        size === 'lg' && 'text-[2.25rem]',
         className,
       )}
     >
-      cantado
-      <span className="text-[var(--accent)]">.</span>
+      friedict
+      <span
+        aria-hidden="true"
+        className="mt-[0.2em] inline-block size-[0.4em] rounded-full border-[0.09em] border-[var(--line-strong)] bg-[var(--accent)]"
+      />
     </span>
   )
 }

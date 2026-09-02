@@ -151,7 +151,7 @@ test.describe('accesibilidad', () => {
   test('el tema oscuro mantiene el contenido legible', async ({ page }) => {
     await signInAs(page, 'bauti@cantado.test')
     await page.addInitScript(() => {
-      window.localStorage.setItem('cantado.theme', 'dark')
+      window.localStorage.setItem('friedict.theme', 'dark')
     })
     await page.goto(`/g/${SEED.losPibes}`)
 

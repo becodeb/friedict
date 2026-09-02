@@ -60,7 +60,7 @@ export function CreateGroup() {
         <Link
           to="/"
           aria-label="Volver"
-          className="grid size-[var(--tap)] -ml-3 place-items-center rounded-[var(--r-sm)] text-[var(--ink-3)] hover:text-[var(--ink)]"
+          className="grid size-[var(--tap)] -ml-3 place-items-center rounded-full text-[var(--ink)] hover:bg-[var(--bg-sunken)]"
         >
           <ArrowLeft size={18} weight="bold" aria-hidden="true" />
         </Link>

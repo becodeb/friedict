@@ -53,7 +53,7 @@ const conSesion = await browser.newContext({
 })
 await conSesion.addInitScript(
   ([key, session]) => window.localStorage.setItem(key, JSON.stringify(session)),
-  ['cantado.auth', data.session],
+  ['friedict.auth', data.session],
 )
 
 const pestanias = [
@@ -84,7 +84,7 @@ for (const url of [`${APP}/`, `${APP}/join/${INVITE}`, `${APP}/join/tokenroto`])
 }
 await sinSesion.pages()[0]?.bringToFront()
 
-console.log('\n  CANTADO — abierto en el navegador\n')
+console.log('\n  friedict — abierto en el navegador\n')
 console.log('  Ventana 1 · con sesión como Bauti')
 for (const { que } of pestanias) console.log(`     · ${que}`)
 console.log('\n  Ventana 2 · sin sesión')

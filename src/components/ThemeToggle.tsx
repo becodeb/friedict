@@ -14,16 +14,16 @@ export function ThemeToggle({ className }: { className?: string }) {
         onClick={toggle}
         aria-label={label}
         className={cn(
-          'grid size-[var(--tap)] place-items-center rounded-[var(--r-sm)]',
-          'text-[var(--ink-3)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]',
+          'grid size-[var(--tap)] place-items-center rounded-full',
+          'text-[var(--ink)] hover:bg-[var(--bg-sunken)]',
           'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
           className,
         )}
       >
         {theme === 'dark' ? (
-          <Sun size={18} weight="bold" aria-hidden="true" />
+          <Sun size={19} weight="bold" aria-hidden="true" />
         ) : (
-          <Moon size={18} weight="bold" aria-hidden="true" />
+          <Moon size={19} weight="bold" aria-hidden="true" />
         )}
       </button>
     </Tooltip>

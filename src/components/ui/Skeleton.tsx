@@ -12,25 +12,22 @@ import { cn } from '@/lib/cn'
 export function Skeleton({ className }: { className?: string }) {
   return (
     <span
-      className={cn('block rounded-[var(--r-xs)] bg-[var(--surface-2)]', className)}
+      className={cn('block rounded-[var(--r-sm)] bg-[var(--bg-sunken)]', className)}
     />
   )
 }
 
 export function SkeletonPredictionCard() {
   return (
-    <li
-      className="relative border-t border-[var(--line)] py-5 pl-4"
-      aria-hidden="true"
-    >
+    <li className="card-pop relative mt-7 px-4 pb-4 pt-6 sm:px-5" aria-hidden="true">
       <div className="t-skel-pulse space-y-3">
-        <Skeleton className="h-3 w-32" />
-        <Skeleton className="h-5 w-[85%]" />
-        <Skeleton className="h-5 w-[60%]" />
-        <div className="space-y-2 pt-1.5">
-          <Skeleton className="h-11 w-full rounded-[var(--r-sm)]" />
-          <Skeleton className="h-11 w-full rounded-[var(--r-sm)]" />
-          <Skeleton className="h-11 w-[92%] rounded-[var(--r-sm)]" />
+        <Skeleton className="absolute -top-[15px] left-4 h-[26px] w-24 rounded-[var(--r-pill)]" />
+        <Skeleton className="h-6 w-[85%]" />
+        <Skeleton className="h-6 w-[60%]" />
+        <div className="space-y-2 pt-2">
+          <Skeleton className="h-[46px] w-full rounded-[var(--r-pill)]" />
+          <Skeleton className="h-[46px] w-full rounded-[var(--r-pill)]" />
+          <Skeleton className="h-[46px] w-[92%] rounded-[var(--r-pill)]" />
         </div>
       </div>
     </li>

@@ -95,7 +95,7 @@ export function InviteDialog({
   const onShare = async (): Promise<void> => {
     try {
       await navigator.share({
-        title: `Sumate a ${groupName} en Cantado`,
+        title: `Sumate a ${groupName} en friedict`,
         text: `Te invito a ${groupName}. Hacemos predicciones sobre lo que va a pasar.`,
         url,
       })
@@ -138,8 +138,8 @@ export function InviteDialog({
         <>
           <p
             className={cn(
-              'break-all rounded-[var(--r-sm)] border border-[var(--line-strong)]',
-              'bg-[var(--surface-2)] px-3.5 py-3 font-mono text-[0.8125rem] text-[var(--ink-2)]',
+              'break-all rounded-[var(--r-md)] border-2 border-dashed border-[var(--line-strong)]',
+              'bg-[var(--bg-sunken)] px-3.5 py-3 font-mono text-[0.8125rem] text-[var(--ink)]',
             )}
           >
             {url}

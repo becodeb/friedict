@@ -13,6 +13,9 @@ import { cssMs } from '@/lib/css'
  * sube desde abajo en mobile. El scrim usa la misma curva y duración que el
  * panel para que se lean como un solo movimiento.
  *
+ * El panel es una tarjeta más del sistema: contorno de tinta y sombra dura. En
+ * mobile pierde el borde inferior porque nace del borde de la pantalla.
+ *
  * Accesibilidad: se monta como `role="dialog" aria-modal`, atrapa el foco en
  * ciclo, cierra con Escape y con click en el scrim, y devuelve el foco al
  * elemento que lo abrió.
@@ -131,7 +134,7 @@ export function Sheet({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6"
       onKeyDown={onKeyDown}
     >
       <button
@@ -139,7 +142,7 @@ export function Sheet({
         aria-label="Cerrar"
         onClick={onClose}
         data-open={visible}
-        className="t-scrim absolute inset-0 cursor-default bg-[oklch(0.22_0.01_60_/_0.45)]"
+        className="t-scrim absolute inset-0 cursor-default bg-[oklch(0.22_0.06_290_/_0.5)]"
         tabIndex={-1}
       />
 
@@ -153,9 +156,10 @@ export function Sheet({
         className={cn(
           // `t-sheet` es panel-reveal en mobile y modal en desktop; el corte
           // está en motion.css.
-          't-sheet relative flex w-full flex-col bg-[var(--surface)] shadow-[var(--shadow-3)]',
+          't-sheet relative flex w-full flex-col bg-[var(--surface)]',
+          'border-2 border-b-0 border-[var(--line-strong)]',
           'rounded-t-[var(--r-lg)] max-h-[92dvh] pb-[max(1.25rem,var(--safe-b))]',
-          'sm:rounded-[var(--r-lg)] sm:max-h-[88dvh] sm:pb-0',
+          'sm:rounded-[var(--r-lg)] sm:border-b-2 sm:shadow-[var(--shadow-3)] sm:max-h-[88dvh] sm:pb-0',
           size === 'sm' && 'sm:max-w-md',
           size === 'md' && 'sm:max-w-lg',
           size === 'lg' && 'sm:max-w-2xl',
@@ -164,11 +168,11 @@ export function Sheet({
         {/* Agarre visual del sheet en mobile. Decorativo. */}
         <span
           aria-hidden="true"
-          className="mx-auto mt-2.5 h-1 w-9 shrink-0 rounded-full bg-[var(--line-strong)] sm:hidden"
+          className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-[var(--ink)] opacity-25 sm:hidden"
         />
         <header className="flex shrink-0 items-start justify-between gap-4 px-5 pt-4 sm:px-6 sm:pt-6">
           <div className="min-w-0">
-            <h2 id={titleId} className="type-title text-[1.25rem]">
+            <h2 id={titleId} className="type-title text-[1.375rem]">
               {title}
             </h2>
             {description && (
@@ -185,8 +189,8 @@ export function Sheet({
             onClick={onClose}
             aria-label="Cerrar"
             className={cn(
-              'grid size-[var(--tap)] shrink-0 place-items-center rounded-[var(--r-sm)]',
-              '-mr-2 -mt-2 text-[var(--ink-3)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]',
+              'grid size-[var(--tap)] shrink-0 place-items-center rounded-full',
+              '-mr-2 -mt-2 text-[var(--ink)] hover:bg-[var(--bg-sunken)]',
               'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
             )}
           >
@@ -197,7 +201,7 @@ export function Sheet({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
 
         {footer && (
-          <footer className="shrink-0 border-t border-[var(--line)] px-5 py-4 sm:px-6">
+          <footer className="shrink-0 border-t-2 border-[var(--line)] px-5 py-4 sm:px-6">
             {footer}
           </footer>
         )}

@@ -1,42 +1,46 @@
-import { cn } from '@/lib/cn'
 import { STATUS_LABEL } from '@/lib/prediction'
 import type { PredictionStatus as Status } from '@/lib/types'
+import { Sticker, type StickerTone } from '@/components/ui/Sticker'
 import { TextSwap } from '@/components/ui/TextSwap'
 
 /**
- * Etiqueta de estado.
+ * Sticker de estado.
  *
  * El estado se comunica por TEXTO además de por color: quien no distingue el
- * ocre del tomate lee igual "En prueba" y "Abierta". El color es refuerzo,
+ * sol de la lima lee igual "En prueba" y "Abierta". El color es refuerzo,
  * nunca el único canal.
  *
  * El cambio de texto usa `text-states-swap`, así que el momento en que una
  * predicción pasa de "En prueba" a "Abierta" se ve, no aparece de golpe.
  */
-const TONE: Record<Status, string> = {
-  proposed: 'text-[var(--status-testing)]',
-  active: 'text-[var(--accent-ink)]',
-  closed: 'text-[var(--status-closed)]',
-  resolving: 'text-[var(--status-closed)]',
-  resolved: 'text-[var(--status-resolved)]',
-  expired: 'text-[var(--status-expired)]',
-  cancelled: 'text-[var(--status-cancelled)]',
+const STATUS_TONE: Record<Status, StickerTone> = {
+  proposed: 'sun',
+  active: 'lime',
+  closed: 'sky',
+  resolving: 'sky',
+  resolved: 'ink',
+  expired: 'grey',
+  cancelled: 'grey',
 }
 
 export function PredictionStatusLabel({
   status,
   className,
   animate = true,
+  cut = false,
+  tilt = 0,
 }: {
   status: Status
   className?: string
   animate?: boolean
+  cut?: boolean
+  tilt?: number
 }) {
   const label = STATUS_LABEL[status]
 
   return (
-    <span className={cn('type-meta', TONE[status], className)}>
+    <Sticker tone={STATUS_TONE[status]} cut={cut} tilt={tilt} className={className}>
       {animate ? <TextSwap value={label} /> : label}
-    </span>
+    </Sticker>
   )
 }

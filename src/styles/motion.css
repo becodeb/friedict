@@ -5,7 +5,7 @@
 
 @layer components {
   /* ==========================================================================
-     Cantado — biblioteca de motion
+     friedict — biblioteca de motion
      --------------------------------------------------------------------------
      Todas las recetas de este archivo están tomadas del catálogo local
      `transitions-dev-react-css/` (transitions.dev). El CSS se conserva tal cual
@@ -183,41 +183,50 @@
     --tabs-ease: var(--ease-standard);
   }
 
+  /* Cada pestaña es una píldora con contorno; la que está activa se pinta de
+     tinta. La píldora de tinta es un elemento aparte que se desliza por
+     debajo, así que el cambio de pestaña se ve viajar. */
   .t-tabs {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 3px;
+    gap: 8px;
+    padding: 0;
     border-radius: var(--r-pill);
-    background: var(--bg-sunken);
+    background: transparent;
   }
   .t-tab {
     position: relative;
     appearance: none;
-    border: 0;
-    background: transparent;
+    border: var(--outline-w) solid var(--line-strong);
+    background: var(--surface);
     /* 44px: objetivo tactil minimo. El alto lo fija el boton, no el texto. */
     min-height: 44px;
     padding: 4px 14px;
-    color: var(--ink-3);
+    color: var(--ink);
+    font-size: 0.8125rem;
+    font-weight: 600;
     cursor: pointer;
     border-radius: var(--r-pill);
     z-index: 1;
-    transition: color var(--tabs-dur) var(--tabs-ease);
+    transition:
+      color var(--tabs-dur) var(--tabs-ease),
+      background-color var(--tabs-dur) var(--tabs-ease);
   }
-  .t-tab:not([aria-selected='true']):hover,
+  .t-tab:not([aria-selected='true']):hover {
+    background: var(--surface-2);
+  }
   .t-tab[aria-selected='true'] {
-    color: var(--ink);
+    color: var(--bg);
+    background: transparent;
   }
   .t-tabs-pill {
     position: absolute;
-    top: 3px;
+    top: 0;
     left: 0;
     height: 44px;
     width: 0;
-    background: var(--surface);
-    box-shadow: var(--shadow-1);
+    background: var(--ink);
     border-radius: var(--r-pill);
     transform: translateX(0);
     transition:
@@ -735,7 +744,7 @@
      -------------------------------------------------------------------------- */
   :root {
     --toggle-dur: var(--motion-mid);
-    --toggle-travel: 18px;
+    --toggle-travel: 22px;
     --toggle-ov1: 1px;
     --toggle-ov2: 0px;
     --toggle-ease: var(--ease-emphasized);
@@ -951,7 +960,7 @@
      él no habría forma de saber que algo está en curso. Se baja la velocidad en
      lugar de frenarlo.
      -------------------------------------------------------------------------- */
-  .cantado-spinner {
+  .friedict-spinner {
     animation: t-spin 700ms linear infinite;
   }
   @keyframes t-spin {
@@ -960,7 +969,7 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .cantado-spinner {
+    .friedict-spinner {
       animation-duration: 1800ms;
     }
   }

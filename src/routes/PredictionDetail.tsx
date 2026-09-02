@@ -14,7 +14,6 @@ import {
 import { useMembers } from '@/data/groups'
 import { usePredictionRealtime } from '@/data/realtime'
 import {
-  STATUS_RAIL,
   canSeeResults,
   effectiveStatus,
   isRevealed,
@@ -29,6 +28,7 @@ import { Countdown } from '@/components/ui/Countdown'
 import { ConfettiBurst } from '@/components/ui/Confetti'
 import { PopNumber } from '@/components/ui/PopNumber'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Burst, Sticker } from '@/components/ui/Sticker'
 import { TextField } from '@/components/ui/Field'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/toast-context'
@@ -115,13 +115,13 @@ export function PredictionDetail() {
   if (prediction.isLoading) {
     return (
       <div className="feed-column space-y-4 pt-6" aria-busy="true">
-        <Skeleton className="h-3 w-28" />
-        <Skeleton className="h-7 w-[85%]" />
-        <Skeleton className="h-7 w-[55%]" />
+        <Skeleton className="h-7 w-28 rounded-[var(--r-pill)]" />
+        <Skeleton className="h-8 w-[85%]" />
+        <Skeleton className="h-8 w-[55%]" />
         <div className="space-y-2 pt-3">
-          <Skeleton className="h-12 w-full rounded-[var(--r-sm)]" />
-          <Skeleton className="h-12 w-full rounded-[var(--r-sm)]" />
-          <Skeleton className="h-12 w-full rounded-[var(--r-sm)]" />
+          <Skeleton className="h-[46px] w-full rounded-[var(--r-pill)]" />
+          <Skeleton className="h-[46px] w-full rounded-[var(--r-pill)]" />
+          <Skeleton className="h-[46px] w-full rounded-[var(--r-pill)]" />
         </div>
       </div>
     )
@@ -164,8 +164,8 @@ export function PredictionDetail() {
       <Link
         to={`/g/${groupId}`}
         className={cn(
-          'inline-flex min-h-[var(--tap)] items-center gap-1.5 -ml-2 rounded-[var(--r-sm)] px-2',
-          'type-meta text-[var(--ink-3)] hover:text-[var(--ink)]',
+          'inline-flex min-h-[var(--tap)] items-center gap-1.5 -ml-2 rounded-[var(--r-pill)] px-2',
+          'text-[0.8125rem] font-semibold text-[var(--ink-2)] hover:bg-[var(--bg-sunken)] hover:text-[var(--ink)]',
           'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
         )}
       >
@@ -173,31 +173,27 @@ export function PredictionDetail() {
         Volver al feed
       </Link>
 
-      <article className="relative mt-2 pl-4">
-        <span
-          className="status-rail"
-          style={{ '--rail': STATUS_RAIL[status] } as React.CSSProperties}
-          aria-hidden="true"
-        />
+      <article className="relative mt-3">
+        {status === 'resolved' && <Burst className="-right-2 -top-3 sm:-right-6" />}
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <PredictionStatusLabel status={status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <PredictionStatusLabel status={status} tilt={-2} />
           {!revealed && status !== 'expired' && (
-            <Countdown
-              target={data.closes_at}
-              prefix="cierra en"
-              className="type-meta text-[var(--ink-3)]"
-            />
+            <Sticker tilt={2}>
+              <Countdown target={data.closes_at} prefix="cierra en" />
+            </Sticker>
           )}
           {data.voting_mode === 'recurring' && (
-            <span className="type-meta inline-flex items-center gap-1 text-[var(--ink-3)]">
-              <Repeat size={12} weight="bold" aria-hidden="true" />
+            <Sticker tone="sky" tilt={-1}>
+              <Repeat size={11} weight="bold" aria-hidden="true" />
               evolutiva
-            </span>
+            </Sticker>
           )}
         </div>
 
-        <h1 className="type-title mt-3 text-[1.5rem]">{data.title}</h1>
+        <h1 className={cn('type-title mt-4 text-[1.75rem]', status === 'resolved' && 'pr-20')}>
+          {data.title}
+        </h1>
 
         {data.description && (
           <p className="mt-2.5 leading-relaxed text-[var(--ink-2)]">{data.description}</p>
@@ -213,11 +209,7 @@ export function PredictionDetail() {
         </p>
 
         {/* Opciones */}
-        <div
-          role="radiogroup"
-          aria-label="Opciones"
-          className="mt-5 space-y-1.5"
-        >
+        <div role="radiogroup" aria-label="Opciones" className="mt-5 space-y-2">
           {data.options.map((option) => (
             <div key={option.id}>
               <VoteOption
@@ -242,7 +234,7 @@ export function PredictionDetail() {
                 }
               />
               {votesByOption.has(option.id) && (
-                <p className="mt-1 pl-3 type-micro text-[var(--ink-3)]">
+                <p className="mt-1 pl-4 type-micro text-[var(--ink-3)]">
                   {votesByOption.get(option.id)?.join(', ')}
                 </p>
               )}
@@ -325,7 +317,7 @@ export function PredictionDetail() {
         <div className="mt-8">
           {/* Altura reservada en el fallback: cuando llega el gráfico no empuja
               nada de lo que está abajo. */}
-          <Suspense fallback={<div className="h-[260px]" aria-hidden="true" />}>
+          <Suspense fallback={<div className="h-[300px]" aria-hidden="true" />}>
             <PredictionTimelineChart points={timeline.data} options={data.options} />
           </Suspense>
         </div>
@@ -345,7 +337,7 @@ export function PredictionDetail() {
 
       {/* Puntos */}
       {status === 'resolved' && (
-        <section className="mt-8" aria-labelledby="puntos-titulo">
+        <section className="card-pop mt-8 px-5 pb-5 pt-4" aria-labelledby="puntos-titulo">
           <h2
             id="puntos-titulo"
             className="type-meta inline-flex items-center gap-1.5 text-[var(--ink-3)]"
@@ -364,20 +356,20 @@ export function PredictionDetail() {
               {(scores.data ?? []).map((score) => (
                 <li
                   key={score.user_id}
-                  className="flex items-center gap-3 border-t border-[var(--line)] py-3"
+                  className="flex items-center gap-3 border-t-2 border-[var(--line)] py-3"
                 >
                   {score.profile && <Avatar person={score.profile} size="sm" />}
-                  <span className="min-w-0 flex-1 truncate text-[0.9375rem]">
+                  <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-medium">
                     {score.profile?.display_name ?? 'Alguien'}
                   </span>
                   {score.correct ? (
-                    <span className="type-meta text-[var(--status-resolved)]">acertó</span>
+                    <Sticker tone="lime">acertó</Sticker>
                   ) : (
                     <span className="type-meta text-[var(--ink-3)]">no</span>
                   )}
                   <span
                     className={cn(
-                      'w-14 text-right font-medium tabular',
+                      'w-14 text-right font-display text-[1.125rem] font-extrabold tabular',
                       score.points > 0 ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]',
                     )}
                   >
@@ -389,7 +381,7 @@ export function PredictionDetail() {
           )}
 
           {myScore?.correct && (
-            <p className="mt-4 rounded-[var(--r-sm)] bg-[var(--accent-wash)] px-3.5 py-3 text-[0.875rem] text-[var(--ink-2)]">
+            <p className="mt-4 rounded-[var(--r-md)] border-2 border-[var(--line-strong)] bg-[var(--accent-wash)] px-4 py-3 text-[0.875rem] text-[var(--ink)]">
               Tus {myScore.points} puntos salen de{' '}
               {explainScore({
                 winnerShare: 0,
@@ -410,7 +402,7 @@ export function PredictionDetail() {
       )}
 
       {canCancel && (
-        <div className="mt-10 border-t border-[var(--line)] pt-5">
+        <div className="mt-10 border-t-2 border-[var(--line)] pt-5">
           <Button
             variant="danger"
             size="sm"

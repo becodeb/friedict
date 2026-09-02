@@ -142,8 +142,8 @@ export function Members() {
                         {...props}
                         aria-label={`Opciones de ${member.profile.display_name}`}
                         className={cn(
-                          'grid size-[var(--tap)] shrink-0 place-items-center rounded-[var(--r-sm)]',
-                          'text-[var(--ink-3)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]',
+                          'grid size-[var(--tap)] shrink-0 place-items-center rounded-full',
+                          'text-[var(--ink)] hover:bg-[var(--bg-sunken)]',
                           'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
                         )}
                       >

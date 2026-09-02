@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 export type Theme = 'light' | 'dark'
 
-const STORAGE_KEY = 'cantado.theme'
+const STORAGE_KEY = 'friedict.theme'
 
 function readStored(): Theme | null {
   try {

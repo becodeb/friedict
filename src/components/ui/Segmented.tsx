@@ -11,6 +11,9 @@ export interface SegmentedOption<T extends string> {
  * Grupo de radios presentado como segmentos. Se usa un `<fieldset>` con radios
  * reales en vez de botones con `aria-pressed`: así las flechas del teclado
  * navegan el grupo sin escribir una sola línea de JS.
+ *
+ * Cada segmento es una tarjetita con contorno; la elegida se rellena de chicle
+ * y se levanta sobre su sombra.
  */
 export function Segmented<T extends string>({
   legend,
@@ -29,12 +32,12 @@ export function Segmented<T extends string>({
 
   return (
     <fieldset className="min-w-0 border-0 p-0">
-      <legend className="mb-1.5 text-[0.8125rem] font-medium text-[var(--ink-2)]">
+      <legend className="mb-1.5 text-[0.8125rem] font-semibold text-[var(--ink-2)]">
         {legend}
       </legend>
       <div
         className={cn(
-          'grid gap-1.5',
+          'grid gap-2',
           columns === 1 && 'grid-cols-1',
           columns === 2 && 'grid-cols-2',
           columns === 3 && 'grid-cols-3',
@@ -47,14 +50,14 @@ export function Segmented<T extends string>({
               key={option.value}
               className={cn(
                 'relative flex min-h-[var(--tap)] cursor-pointer flex-col justify-center',
-                'rounded-[var(--r-sm)] border px-3 py-2',
-                'transition-[border-color,background-color] duration-[var(--motion-fast)]',
+                'rounded-[var(--r-md)] border-2 border-[var(--line-strong)] px-3 py-2',
+                'transition-[background-color,box-shadow,transform] duration-[var(--motion-fast)]',
                 'ease-[var(--ease-standard)] motion-reduce:transition-none',
                 'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2',
-                'has-[:focus-visible]:outline-[var(--accent)]',
+                'has-[:focus-visible]:outline-[var(--ink)]',
                 selected
-                  ? 'border-[var(--accent)] bg-[var(--accent-wash)]'
-                  : 'border-[var(--line-strong)] hover:border-[var(--ink-3)]',
+                  ? 'bg-[var(--accent)] text-[var(--on-candy)] shadow-[var(--shadow-1)]'
+                  : 'bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--surface-2)]',
               )}
             >
               <input
@@ -65,16 +68,14 @@ export function Segmented<T extends string>({
                 onChange={() => onChange(option.value)}
                 className="sr-only"
               />
-              <span
-                className={cn(
-                  'text-[0.875rem] font-medium',
-                  selected ? 'text-[var(--accent-ink)]' : 'text-[var(--ink)]',
-                )}
-              >
-                {option.label}
-              </span>
+              <span className="text-[0.875rem] font-semibold">{option.label}</span>
               {option.description && (
-                <span className="mt-0.5 type-micro text-[var(--ink-3)]">
+                <span
+                  className={cn(
+                    'mt-0.5 type-micro',
+                    selected ? 'opacity-80' : 'text-[var(--ink-3)]',
+                  )}
+                >
                   {option.description}
                 </span>
               )}

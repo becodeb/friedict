@@ -10,10 +10,10 @@ export interface TabItem<T extends string> {
 /**
  * transitions-dev-react-css/tabs-sliding/tabs-sliding.txt
  *
- * La píldora es un elemento absoluto cuyo `transform` y `width` se escriben
- * inline; la transición interpola entre la posición medida anterior y la nueva.
- * En el primer layout se posiciona sin animar para que no salga volando desde
- * la izquierda.
+ * Cada pestaña es una píldora con contorno. La píldora de tinta es un elemento
+ * absoluto cuyo `transform` y `width` se escriben inline; la transición
+ * interpola entre la posición medida anterior y la nueva. En el primer layout
+ * se posiciona sin animar para que no salga volando desde la izquierda.
  *
  * La receta original escuchaba `window.resize`; acá se usa un `ResizeObserver`
  * sobre la propia barra, que además reacciona a cambios de contenido (los
@@ -49,15 +49,16 @@ export function Tabs<T extends string>({
     if (!animate) {
       const previous = pill.style.transition
       pill.style.transition = 'none'
-      pill.style.transform = `translateX(${active.offsetLeft - 3}px)`
+      pill.style.transform = `translateX(${active.offsetLeft}px)`
       pill.style.width = `${active.offsetWidth}px`
       pill.style.height = `${active.offsetHeight}px`
       void pill.offsetWidth
       pill.style.transition = previous
       return
     }
-    pill.style.transform = `translateX(${active.offsetLeft - 3}px)`
+    pill.style.transform = `translateX(${active.offsetLeft}px)`
     pill.style.width = `${active.offsetWidth}px`
+    pill.style.height = `${active.offsetHeight}px`
   }, [])
 
   useLayoutEffect(() => {
@@ -113,16 +114,11 @@ export function Tabs<T extends string>({
             aria-selected={selected}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(item.value)}
-            className="t-tab type-meta whitespace-nowrap"
+            className="t-tab whitespace-nowrap"
           >
             {item.label}
             {typeof item.count === 'number' && (
-              <span
-                className={cn(
-                  'ml-1.5 tabular',
-                  selected ? 'text-[var(--accent-ink)]' : 'text-[var(--ink-3)]',
-                )}
-              >
+              <span className={cn('ml-1.5 tabular', selected ? 'opacity-80' : 'text-[var(--ink-3)]')}>
                 {item.count}
               </span>
             )}

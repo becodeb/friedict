@@ -112,11 +112,11 @@ export function DropdownMenu({
           data-origin={align}
           className={cn(
             't-dropdown absolute z-40 min-w-[13rem] overflow-hidden',
-            'rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface)] p-1',
-            'shadow-[var(--shadow-3)]',
-            align === 'top-right' && 'right-0 top-[calc(100%+6px)]',
-            align === 'top-left' && 'left-0 top-[calc(100%+6px)]',
-            align === 'bottom-right' && 'bottom-[calc(100%+6px)] right-0',
+            'rounded-[var(--r-md)] border-2 border-[var(--line-strong)] bg-[var(--surface)] p-1.5',
+            'shadow-[var(--shadow-2)]',
+            align === 'top-right' && 'right-0 top-[calc(100%+8px)]',
+            align === 'top-left' && 'left-0 top-[calc(100%+8px)]',
+            align === 'bottom-right' && 'bottom-[calc(100%+8px)] right-0',
             open ? 'is-open' : 'is-closing',
           )}
         >
@@ -134,13 +134,13 @@ export function DropdownMenu({
                 action.onSelect()
               }}
               className={cn(
-                'flex min-h-[var(--tap)] w-full items-center gap-2.5 rounded-[var(--r-xs)]',
-                'px-3 text-left text-[0.875rem]',
+                'flex min-h-[var(--tap)] w-full items-center gap-2.5 rounded-[var(--r-sm)]',
+                'px-3 text-left text-[0.875rem] font-medium',
                 'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
                 'disabled:cursor-not-allowed disabled:text-[var(--ink-3)]',
                 action.tone === 'danger'
                   ? 'text-[var(--danger)] hover:bg-[var(--danger-wash)]'
-                  : 'text-[var(--ink)] hover:bg-[var(--surface-2)]',
+                  : 'text-[var(--ink)] hover:bg-[var(--bg-sunken)]',
               )}
             >
               {action.icon}

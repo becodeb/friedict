@@ -5,6 +5,9 @@ import { navDestinations } from './navigation'
 /**
  * Navegación inferior en mobile.
  *
+ * Barra blanca con línea de tinta arriba. El ícono de la sección activa va
+ * dentro de una píldora de chicle con contorno, como un sticker pegado.
+ *
  * El badge de novedad usa
  * transitions-dev-react-css/notification-badge/notification-badge.txt: el punto
  * entra deslizándose y escalando desde 0, en vez de aparecer de golpe.
@@ -22,9 +25,8 @@ export function BottomNav({
     <nav
       aria-label="Secciones del grupo"
       className={cn(
-        'fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)]',
-        'bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur-md',
-        'pb-[var(--safe-b)] sm:hidden',
+        'fixed inset-x-0 bottom-0 z-30 border-t-2 border-[var(--line-strong)]',
+        'bg-[var(--surface)] pb-[var(--safe-b)] sm:hidden',
       )}
     >
       <ul className="mx-auto flex max-w-md">
@@ -47,17 +49,25 @@ export function BottomNav({
               >
                 {({ isActive }) => (
                   <>
-                    <span className="relative">
+                    <span
+                      className={cn(
+                        'relative grid h-8 w-12 place-items-center rounded-[var(--r-pill)] border-2',
+                        'transition-colors duration-[var(--motion-fast)] motion-reduce:transition-none',
+                        isActive
+                          ? 'border-[var(--line-strong)] bg-[var(--accent)] text-[var(--on-candy)]'
+                          : 'border-transparent',
+                      )}
+                    >
                       <Icon
-                        size={21}
+                        size={20}
                         weight={isActive ? 'fill' : 'regular'}
                         aria-hidden="true"
                       />
                       <span className="t-badge" data-open={showBadge ? 'true' : 'false'}>
-                        <span className="t-badge-dot block size-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--bg)]" />
+                        <span className="t-badge-dot block size-2.5 rounded-full border-2 border-[var(--line-strong)] bg-[var(--candy-sun)]" />
                       </span>
                     </span>
-                    <span className="type-micro font-medium">{destination.label}</span>
+                    <span className="type-micro font-semibold">{destination.label}</span>
                   </>
                 )}
               </NavLink>

@@ -17,28 +17,34 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   iconRight?: ReactNode
 }
 
+/**
+ * Botón: píldora con contorno de tinta y sombra dura. Al apretarlo se hunde
+ * sobre su sombra (se desplaza 2px y la sombra desaparece), que es lo que lo
+ * hace sentir impreso y no dibujado.
+ */
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-[var(--accent)] text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] ' +
-    'active:translate-y-px disabled:bg-[var(--line-strong)] disabled:text-[var(--ink-3)]',
+    'border-[var(--line-strong)] bg-[var(--accent)] text-[var(--on-candy)] shadow-[var(--shadow-2)] ' +
+    'hover:bg-[var(--accent-hover)] ' +
+    'disabled:border-[var(--line)] disabled:bg-[var(--bg-sunken)] disabled:text-[var(--ink-3)] disabled:shadow-none',
   secondary:
-    'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] ' +
-    'hover:border-[var(--ink-3)] hover:bg-[var(--surface-2)] active:translate-y-px ' +
-    'disabled:text-[var(--ink-3)] disabled:border-[var(--line)]',
+    'border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] shadow-[var(--shadow-2)] ' +
+    'hover:bg-[var(--surface-2)] ' +
+    'disabled:border-[var(--line)] disabled:text-[var(--ink-3)] disabled:shadow-none',
   ghost:
-    'bg-transparent text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] ' +
-    'active:translate-y-px disabled:text-[var(--ink-3)]',
+    'border-transparent bg-transparent text-[var(--ink-2)] ' +
+    'hover:bg-[var(--bg-sunken)] hover:text-[var(--ink)] disabled:text-[var(--ink-3)]',
   danger:
-    'bg-transparent text-[var(--danger)] border border-[var(--line-strong)] ' +
-    'hover:bg-[var(--danger-wash)] hover:border-[var(--danger)] active:translate-y-px',
+    'border-[var(--line-strong)] bg-[var(--surface)] text-[var(--danger)] shadow-[var(--shadow-2)] ' +
+    'hover:bg-[var(--danger-wash)] disabled:border-[var(--line)] disabled:shadow-none',
 }
 
 // Todos los tamaños respetan el objetivo táctil de 44px: `sm` compensa con
 // padding vertical aunque el texto sea chico.
 const SIZES: Record<Size, string> = {
-  sm: 'min-h-[var(--tap)] px-3 text-[0.8125rem] gap-1.5',
-  md: 'min-h-[var(--tap)] px-4 text-[0.9375rem] gap-2',
-  lg: 'min-h-[52px] px-5 text-base gap-2',
+  sm: 'min-h-[var(--tap)] px-3.5 text-[0.8125rem] gap-1.5',
+  md: 'min-h-[var(--tap)] px-4.5 text-[0.9375rem] gap-2',
+  lg: 'min-h-[52px] px-6 text-base gap-2',
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -59,6 +65,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   ref,
 ) {
   const isBusy = loading || succeeded
+  const pressable = variant !== 'ghost'
 
   return (
     <button
@@ -67,12 +74,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        'relative inline-flex items-center justify-center rounded-[var(--r-sm)]',
-        'font-medium tracking-[-0.01em] select-none',
+        'relative inline-flex items-center justify-center rounded-[var(--r-pill)] border-2',
+        'font-semibold tracking-[-0.01em] select-none',
         'transition-[background-color,border-color,color,transform,box-shadow]',
         'duration-[var(--motion-fast)] ease-[var(--ease-standard)]',
-        'disabled:cursor-not-allowed disabled:active:translate-y-0',
-        'motion-reduce:transition-none motion-reduce:active:translate-y-0',
+        pressable &&
+          'active:translate-x-[2px] active:translate-y-[2px] active:shadow-none',
+        'disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0',
+        'motion-reduce:transition-none motion-reduce:active:translate-x-0 motion-reduce:active:translate-y-0',
         VARIANTS[variant],
         SIZES[size],
         block && 'w-full',

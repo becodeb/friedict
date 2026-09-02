@@ -16,9 +16,9 @@ const SIZES = {
 } as const
 
 /**
- * Avatar por iniciales sobre un color de la paleta. Sin fotos: cero subida de
- * archivos, cero moderación de imágenes, y una identidad visual consistente
- * desde el primer segundo.
+ * Avatar por iniciales sobre una golosina, con contorno de tinta. Sin fotos:
+ * cero subida de archivos, cero moderación de imágenes, y una identidad visual
+ * consistente desde el primer segundo.
  *
  * Las dimensiones son fijas por clase para que nunca genere CLS.
  */
@@ -37,8 +37,8 @@ export function Avatar({
   return (
     <span
       className={cn(
-        'inline-grid shrink-0 place-items-center rounded-full font-semibold uppercase',
-        'text-white ring-2 ring-[var(--bg)] tracking-[0.02em]',
+        'inline-grid shrink-0 place-items-center rounded-full font-bold uppercase',
+        'border-2 border-[var(--line-strong)] text-[var(--on-candy)] ring-2 ring-[var(--bg)] tracking-[0.02em]',
         SIZES[size],
         className,
       )}
@@ -127,7 +127,7 @@ export function AvatarStack({
             <span
               className={cn(
                 'inline-grid shrink-0 place-items-center rounded-full',
-                'bg-[var(--surface-2)] text-[var(--ink-2)] font-semibold',
+                'border-2 border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] font-bold',
                 'ring-2 ring-[var(--bg)] tabular',
                 SIZES[size],
               )}

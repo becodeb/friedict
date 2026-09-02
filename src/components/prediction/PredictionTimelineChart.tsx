@@ -73,7 +73,7 @@ export function PredictionTimelineChart({
   if (rows.length < 2 || series.length === 0) return null
 
   return (
-    <section aria-labelledby="evolucion-titulo">
+    <section aria-labelledby="evolucion-titulo" className="card-pop p-5">
       <h2 id="evolucion-titulo" className="type-meta text-[var(--ink-3)]">
         Cómo fue cambiando
       </h2>
@@ -88,14 +88,14 @@ export function PredictionTimelineChart({
             <CartesianGrid stroke="var(--line)" strokeDasharray="2 4" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: 'var(--ink-3)', fontSize: 11 }}
+              tick={{ fill: 'var(--ink-3)', fontSize: 11, fontWeight: 600 }}
               tickLine={false}
-              axisLine={{ stroke: 'var(--line)' }}
+              axisLine={{ stroke: 'var(--line-strong)', strokeWidth: 2 }}
               minTickGap={24}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: 'var(--ink-3)', fontSize: 11 }}
+              tick={{ fill: 'var(--ink-3)', fontSize: 11, fontWeight: 600 }}
               tickLine={false}
               axisLine={false}
               width={40}
@@ -103,13 +103,14 @@ export function PredictionTimelineChart({
             <Tooltip
               contentStyle={{
                 background: 'var(--surface)',
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--r-sm)',
+                border: '2px solid var(--line-strong)',
+                borderRadius: 'var(--r-md)',
                 fontSize: 13,
+                fontWeight: 500,
                 color: 'var(--ink)',
-                boxShadow: 'var(--shadow-2)',
+                boxShadow: 'var(--shadow-1)',
               }}
-              labelStyle={{ color: 'var(--ink-3)', fontSize: 11 }}
+              labelStyle={{ color: 'var(--ink-3)', fontSize: 11, fontWeight: 600 }}
               formatter={(value, name) => {
                 const option = series.find((candidate) => candidate.id === name)
                 return [`${String(value)} votos`, option?.label ?? String(name)]
@@ -122,9 +123,9 @@ export function PredictionTimelineChart({
                 dataKey={option.id}
                 name={option.id}
                 stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
-                strokeWidth={2}
+                strokeWidth={3}
                 dot={false}
-                activeDot={{ r: 4 }}
+                activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--ink)' }}
                 isAnimationActive={false}
               />
             ))}
@@ -133,15 +134,15 @@ export function PredictionTimelineChart({
       </div>
 
       {/* Leyenda propia: la de Recharts no se puede alinear al sistema tipográfico. */}
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
         {series.map((option, index) => (
           <li key={option.id} className="inline-flex items-center gap-1.5">
             <span
               aria-hidden="true"
-              className="size-2.5 shrink-0 rounded-full"
+              className="size-3 shrink-0 rounded-full border-2 border-[var(--line-strong)]"
               style={{ background: SERIES_COLORS[index % SERIES_COLORS.length] }}
             />
-            <span className="type-micro text-[var(--ink-2)]">{option.label}</span>
+            <span className="type-micro font-medium text-[var(--ink-2)]">{option.label}</span>
           </li>
         ))}
       </ul>
