@@ -4,7 +4,6 @@ import { useAuth } from '@/auth/useAuth'
 import { Spinner } from '@/components/ui/Spinner'
 import { Landing } from '@/routes/Landing'
 import { Login } from '@/routes/Login'
-import { AuthCallback } from '@/routes/AuthCallback'
 import { GroupShell } from '@/components/layout/GroupShell'
 import { GroupFeed } from '@/routes/GroupFeed'
 
@@ -52,11 +51,11 @@ function RouteFallback() {
 
 /** Puerta de sesión. Guarda a dónde iba para volver después del Magic Link. */
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth()
+  const { user, loading } = useAuth()
   const location = useLocation()
 
   if (loading) return <RouteFallback />
-  if (!session) {
+  if (!user) {
     const next = `${location.pathname}${location.search}`
     return <Navigate to={`/entrar?next=${encodeURIComponent(next)}`} replace />
   }
@@ -69,7 +68,6 @@ export function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/entrar" element={<Login />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/join/:token" element={<JoinInvite />} />
 
         <Route

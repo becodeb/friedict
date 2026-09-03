@@ -20,7 +20,7 @@ export default async function globalSetup(): Promise<void> {
   }
 
   console.log('[e2e] reiniciando la base local…')
-  await run('npx', ['--yes', 'supabase@latest', 'db', 'reset'], {
+  await run('node', ['scripts/db-reset.mjs'], {
     shell: true,
     windowsHide: true,
     maxBuffer: 10 * 1024 * 1024,

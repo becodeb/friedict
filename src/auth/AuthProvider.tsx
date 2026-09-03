@@ -1,123 +1,127 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { Session } from '@supabase/supabase-js'
 import { useQueryClient } from '@tanstack/react-query'
-import { supabase, authRedirectTo } from '@/lib/supabase'
+import { apiGet, apiPost } from '@/lib/api'
 import type { Profile } from '@/lib/types'
-import { AuthContext, type AuthState } from './context'
+import { AuthContext, type AuthState, type SessionUser } from './context'
 
 /**
  * Sesión y perfil.
  *
- * Dos caminos de entrada: Magic Link (no le pedimos a nadie que invente una
- * contraseña para votar si Fran llega tarde) y Google, que no depende de tener
- * un proveedor de mail saliente configurado. El perfil (nombre visible y
- * color) se crea recién en el onboarding, así que puede haber sesión sin
- * perfil: ese es el estado `needsProfile`, y es el mismo sin importar por
- * dónde entró la persona.
+ * La sesión vive en una cookie `httpOnly` que este código no puede leer —ese
+ * es justamente el punto: un XSS no se la puede llevar—. Por eso al arrancar
+ * se le pregunta al servidor quién sos (`/api/auth/me`) en lugar de leer un
+ * token de localStorage.
+ *
+ * El perfil (nombre visible y color) se crea recién en el onboarding, así que
+ * puede haber sesión sin perfil: ese es el estado `needsProfile`, y es el
+ * mismo sin importar si entraste con contraseña o con Google.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
-  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<SessionUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
   const loadProfile = useCallback(async (userId: string): Promise<Profile | null> => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle()
-    if (error) return null
-    return data
+    try {
+      return await apiGet<Profile | null>(`/profiles/${userId}`)
+    } catch {
+      return null
+    }
   }, [])
 
   useEffect(() => {
     let active = true
 
-    void supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      if (data.session?.user) {
-        const next = await loadProfile(data.session.user.id)
-        if (active) setProfile(next)
+    void (async () => {
+      try {
+        const { user: session } = await apiGet<{ user: SessionUser | null }>('/auth/me')
+        if (!active) return
+        setUser(session)
+        if (session) {
+          const next = await loadProfile(session.id)
+          if (active) setProfile(next)
+        }
+      } catch {
+        // El servidor no contestó. Se sigue como anónimo: la pantalla de
+        // ingreso es un lugar razonable donde caer.
+        if (active) setUser(null)
+      } finally {
+        if (active) setLoading(false)
       }
-      if (active) setLoading(false)
-    })
-
-    const { data: subscription } = supabase.auth.onAuthStateChange(
-      (event, nextSession) => {
-        setSession(nextSession)
-
-        if (event === 'SIGNED_OUT') {
-          setProfile(null)
-          queryClient.clear()
-          return
-        }
-
-        // `onAuthStateChange` no admite callbacks async sin riesgo de deadlock
-        // con el propio cliente, así que el trabajo se difiere.
-        if (nextSession?.user) {
-          setTimeout(() => {
-            void loadProfile(nextSession.user.id).then((next) => {
-              setProfile(next)
-            })
-          }, 0)
-        }
-      },
-    )
+    })()
 
     return () => {
       active = false
-      subscription.subscription.unsubscribe()
     }
-  }, [loadProfile, queryClient])
+  }, [loadProfile])
 
-  const signInWithEmail = useCallback(async (email: string, next?: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: authRedirectTo(next),
-        shouldCreateUser: true,
-      },
-    })
-    if (error) throw error
-  }, [])
+  /** Después de entrar hay que traer el perfil antes de soltar la pantalla. */
+  const adopt = useCallback(
+    async (session: SessionUser) => {
+      setUser(session)
+      setProfile(await loadProfile(session.id))
+    },
+    [loadProfile],
+  )
 
-  // OAuth redirige de verdad al proveedor: no hay nada que esperar acá
-  // adentro. La sesión llega después, cuando `/auth/callback` canjea el código
-  // y `onAuthStateChange` la levanta como cualquier otra.
-  const signInWithGoogle = useCallback(async (next?: string) => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: authRedirectTo(next) },
-    })
-    if (error) throw error
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      const { user: session } = await apiPost<{ user: SessionUser }>('/auth/login', {
+        email,
+        password,
+      })
+      await adopt(session)
+    },
+    [adopt],
+  )
+
+  const signUp = useCallback(
+    async (email: string, password: string) => {
+      const { user: session } = await apiPost<{ user: SessionUser }>('/auth/register', {
+        email,
+        password,
+      })
+      await adopt(session)
+    },
+    [adopt],
+  )
+
+  // No es una promesa: OAuth es una navegación de verdad, el navegador se va a
+  // Google y vuelve por el callback del servidor con la cookie ya puesta.
+  const signInWithGoogle = useCallback((next?: string) => {
+    const url = next
+      ? `/api/auth/google?next=${encodeURIComponent(next)}`
+      : '/api/auth/google'
+    window.location.href = url
   }, [])
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
+    await apiPost<void>('/auth/logout')
+    setUser(null)
     setProfile(null)
+    // El caché tiene datos de grupos privados: se tira entero.
     queryClient.clear()
   }, [queryClient])
 
   const refreshProfile = useCallback(async () => {
-    if (!session?.user) return
-    setProfile(await loadProfile(session.user.id))
-  }, [session, loadProfile])
+    if (!user) return
+    setProfile(await loadProfile(user.id))
+  }, [user, loadProfile])
 
   const value = useMemo<AuthState>(
     () => ({
-      session,
-      user: session?.user ?? null,
+      user,
       profile,
       loading,
-      needsProfile: Boolean(session?.user) && profile === null && !loading,
-      signInWithEmail,
+      needsProfile: Boolean(user) && profile === null && !loading,
+      signIn,
+      signUp,
       signInWithGoogle,
       signOut,
       refreshProfile,
     }),
-    [session, profile, loading, signInWithEmail, signInWithGoogle, signOut, refreshProfile],
+    [user, profile, loading, signIn, signUp, signInWithGoogle, signOut, refreshProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

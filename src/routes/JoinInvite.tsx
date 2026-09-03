@@ -23,7 +23,7 @@ export function JoinInvite() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
   const toast = useToast()
-  const { session, profile, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
 
   const preview = usePeekInvite(token)
   const joinGroup = useJoinGroup()
@@ -104,7 +104,7 @@ export function JoinInvite() {
               </Button>
             </RevealLine>
           </Reveal>
-        ) : !session ? (
+        ) : !user ? (
           <Reveal>
             <RevealLine as="p" index={1} className="type-meta text-[var(--ink-3)]">
               Te invitaron a

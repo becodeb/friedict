@@ -1,14 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, EnvelopeSimple } from '@phosphor-icons/react'
+import { ArrowLeft } from '@phosphor-icons/react'
 import { useAuth } from '@/auth/useAuth'
-import { supabase } from '@/lib/supabase'
 import { emailSchema } from '@/lib/validation'
 import { friendlyError } from '@/lib/errors'
 import { Logo } from '@/components/Logo'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/Field'
-import { Reveal, RevealLine } from '@/components/ui/Reveal'
 import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/toast-context'
 
@@ -39,10 +37,9 @@ function GoogleGlyph() {
 }
 
 /**
- * Cuentas del seed local (`supabase/seed.sql`), para entrar sin pasar por
- * mail ni por Google mientras se prueba en la propia máquina. La contraseña
- * es siempre `cantado123` y sólo existe en el stack local — no hay login por
- * contraseña ni acá ni en producción.
+ * Cuentas del seed local (`db/seed.sql`), para entrar sin escribir nada
+ * mientras se prueba en la propia máquina. La contraseña es siempre
+ * `cantado123` y sólo existe en ese seed.
  */
 const DEV_ACCOUNTS = [
   { id: 'bauti', email: 'bauti@cantado.test', display_name: 'Bauti', avatar_seed: 'BA', accent: 0 },
@@ -53,30 +50,12 @@ const DEV_ACCOUNTS = [
   { id: 'caro', email: 'caro@cantado.test', display_name: 'Caro', avatar_seed: 'CA', accent: 5 },
 ] as const
 
-function DevQuickLogin({ next }: { next?: string }) {
-  const navigate = useNavigate()
-  const toast = useToast()
-  const [busy, setBusy] = useState<string | null>(null)
-
-  const onPick = async (email: string): Promise<void> => {
-    setBusy(email)
-    const { error } = await supabase.auth.signInWithPassword({ email, password: 'cantado123' })
-    setBusy(null)
-    if (error) {
-      toast.show({
-        message: friendlyError(error, '¿Corriste `npm run db:reset`? Esa cuenta no existe.'),
-        tone: 'error',
-      })
-      return
-    }
-    navigate(next && next.startsWith('/') ? next : '/', { replace: true })
-  }
-
+function DevQuickLogin({ onPick, busy }: { onPick: (email: string) => void; busy: string | null }) {
   return (
     <div className="mt-10 rounded-[var(--r-md)] border-2 border-dashed border-[var(--line-strong)] p-4">
       <p className="type-meta text-[var(--ink-3)]">Sólo en local · seed de prueba</p>
       <p className="mt-1.5 text-[0.8125rem] text-[var(--ink-2)]">
-        Entrá directo como alguien del seed, sin mail ni Google.
+        Entrá directo como alguien del seed, sin escribir nada.
       </p>
       <ul className="mt-3 flex flex-wrap gap-2">
         {DEV_ACCOUNTS.map((account) => (
@@ -84,7 +63,7 @@ function DevQuickLogin({ next }: { next?: string }) {
             <button
               type="button"
               disabled={busy !== null}
-              onClick={() => void onPick(account.email)}
+              onClick={() => onPick(account.email)}
               className="flex min-h-[var(--tap)] items-center gap-2 rounded-[var(--r-pill)] border-2 border-[var(--line-strong)] bg-[var(--surface)] py-1 pl-1.5 pr-3.5 text-[0.8125rem] font-semibold text-[var(--ink)] transition-[background-color,box-shadow] duration-[var(--motion-fast)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
             >
               <Avatar person={account} size="xs" />
@@ -100,54 +79,78 @@ function DevQuickLogin({ next }: { next?: string }) {
 /**
  * Ingreso.
  *
- * Dos caminos, sin jerarquía forzada entre ellos: Google entra directo, y el
- * Magic Link no pide inventar ni recordar una contraseña para votar si Fran
- * llega tarde. En desarrollo se suma un tercero, sólo visible con `npm run
- * dev` (`import.meta.env.DEV` se elimina del bundle de producción, así que
- * esto no puede llegar a aparecer en la app real).
+ * Dos caminos: Google, que entra directo, y mail con contraseña. El Magic Link
+ * quedó afuera porque necesita un proveedor de mail saliente, y una app de
+ * amigos no puede depender de que el mail funcione para poder entrar.
+ *
+ * El mismo formulario sirve para entrar y para registrarse: son los mismos dos
+ * campos, y obligar a elegir entre dos pantallas idénticas antes de escribir
+ * nada es fricción sin ningún beneficio.
  */
 export function Login() {
-  const { signInWithEmail, signInWithGoogle } = useAuth()
+  const { signIn, signUp, signInWithGoogle } = useAuth()
+  const navigate = useNavigate()
+  const toast = useToast()
   const [params] = useSearchParams()
   const next = params.get('next') ?? undefined
+  const googleError = params.get('error')
 
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [sending, setSending] = useState(false)
-  const [sentTo, setSentTo] = useState<string | null>(null)
-  const [googleLoading, setGoogleLoading] = useState(false)
+  const [password, setPassword] = useState('')
+  const [emailError, setEmailError] = useState<string | undefined>(undefined)
+  const [passwordError, setPasswordError] = useState<string | undefined>(undefined)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const goNext = (): void => {
+    navigate(next && next.startsWith('/') ? next : '/', { replace: true })
+  }
 
   const onSubmit = async (event: FormEvent): Promise<void> => {
     event.preventDefault()
-    setError(undefined)
+    setEmailError(undefined)
+    setPasswordError(undefined)
 
     const parsed = emailSchema.safeParse(email)
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Ese email no parece válido.')
+      setEmailError(parsed.error.issues[0]?.message ?? 'Ese email no parece válido.')
+      return
+    }
+    if (password.length < 8) {
+      setPasswordError('La contraseña necesita al menos 8 caracteres.')
       return
     }
 
-    setSending(true)
+    setBusy('form')
     try {
-      await signInWithEmail(parsed.data, next)
-      setSentTo(parsed.data)
-    } catch (caught) {
-      setError(friendlyError(caught, 'No pudimos mandar el mail. Probá otra vez.'))
-    } finally {
-      setSending(false)
+      if (mode === 'signup') await signUp(parsed.data, password)
+      else await signIn(parsed.data, password)
+      goNext()
+    } catch (error) {
+      toast.show({
+        message: friendlyError(
+          error,
+          mode === 'signup'
+            ? 'No pudimos crear la cuenta.'
+            : 'Mail o contraseña incorrectos.',
+        ),
+        tone: 'error',
+      })
+      setBusy(null)
     }
   }
 
-  const onGoogle = async (): Promise<void> => {
-    setError(undefined)
-    setGoogleLoading(true)
+  const onQuickLogin = async (accountEmail: string): Promise<void> => {
+    setBusy(accountEmail)
     try {
-      // Si esto no tira error, el navegador ya se está yendo a Google: el
-      // `finally` de abajo casi nunca llega a correr.
-      await signInWithGoogle(next)
-    } catch (caught) {
-      setError(friendlyError(caught, 'No pudimos abrir el ingreso con Google.'))
-      setGoogleLoading(false)
+      await signIn(accountEmail, 'cantado123')
+      goNext()
+    } catch (error) {
+      toast.show({
+        message: friendlyError(error, '¿Corriste `npm run db:reset`? Esa cuenta no existe.'),
+        tone: 'error',
+      })
+      setBusy(null)
     }
   }
 
@@ -165,85 +168,91 @@ export function Login() {
       </header>
 
       <main className="feed-column flex flex-1 flex-col justify-center pb-24 pt-10">
-        {sentTo ? (
-          <Reveal key="sent">
-            <RevealLine index={1}>
-              <span
-                className="grid size-12 place-items-center rounded-full border-2 border-[var(--line-strong)] bg-[var(--accent)] text-[var(--on-candy)] shadow-[var(--shadow-1)]"
-                aria-hidden="true"
-              >
-                <EnvelopeSimple size={22} weight="bold" />
-              </span>
-            </RevealLine>
-            <RevealLine as="h1" index={2} className="type-title mt-5 max-w-[16ch]">
-              Te mandamos un link
-            </RevealLine>
-            <RevealLine as="p" index={3} className="mt-3 max-w-[38ch] text-[var(--ink-2)]">
-              Está en <strong className="font-semibold text-[var(--ink)]">{sentTo}</strong>.
-              Abrilo desde este mismo dispositivo y entrás directo.
-            </RevealLine>
-            <RevealLine index={4} className="mt-6">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setSentTo(null)
-                  setEmail('')
-                }}
-              >
-                Usar otro email
-              </Button>
-            </RevealLine>
-          </Reveal>
-        ) : (
-          <>
-            <h1 className="type-title max-w-[14ch]">Entrá a friedict</h1>
-            <p className="mt-3 max-w-[38ch] text-[var(--ink-2)]">
-              Con Google entrás directo. Con tu mail, te mandamos un link.
-            </p>
+        <h1 className="type-title max-w-[14ch]">
+          {mode === 'signup' ? 'Creá tu cuenta' : 'Entrá a friedict'}
+        </h1>
+        <p className="mt-3 max-w-[38ch] text-[var(--ink-2)]">
+          Con Google entrás directo. También podés usar tu mail y una contraseña.
+        </p>
 
-            <div className="mt-7 max-w-sm">
-              <Button
-                variant="secondary"
-                size="lg"
-                block
-                loading={googleLoading}
-                onClick={() => void onGoogle()}
-                iconLeft={<GoogleGlyph />}
-              >
-                Continuar con Google
-              </Button>
-
-              <div className="my-5 flex items-center gap-3" aria-hidden="true">
-                <span className="h-0.5 flex-1 bg-[var(--line)]" />
-                <span className="type-meta text-[var(--ink-3)]">o con tu mail</span>
-                <span className="h-0.5 flex-1 bg-[var(--line)]" />
-              </div>
-
-              <form onSubmit={onSubmit} noValidate>
-                <TextField
-                  label="Tu email"
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  placeholder="vos@ejemplo.com"
-                  value={email}
-                  error={error}
-                  onChange={(event) => {
-                    setEmail(event.target.value)
-                    if (error) setError(undefined)
-                  }}
-                />
-                <Button type="submit" size="lg" block className="mt-5" loading={sending}>
-                  Mandame el link
-                </Button>
-              </form>
-
-              {import.meta.env.DEV && <DevQuickLogin next={next} />}
-            </div>
-          </>
+        {googleError && (
+          <p
+            role="alert"
+            className="mt-4 max-w-sm rounded-[var(--r-md)] border-2 border-[var(--danger)] bg-[var(--danger-wash)] px-3.5 py-3 text-[0.875rem] text-[var(--ink)]"
+          >
+            No pudimos completar el ingreso con Google. Probá de nuevo o entrá con tu mail.
+          </p>
         )}
+
+        <div className="mt-7 max-w-sm">
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={() => signInWithGoogle(next)}
+            iconLeft={<GoogleGlyph />}
+          >
+            Continuar con Google
+          </Button>
+
+          <div className="my-5 flex items-center gap-3" aria-hidden="true">
+            <span className="h-0.5 flex-1 bg-[var(--line)]" />
+            <span className="type-meta text-[var(--ink-3)]">o con tu mail</span>
+            <span className="h-0.5 flex-1 bg-[var(--line)]" />
+          </div>
+
+          <form onSubmit={onSubmit} noValidate className="space-y-4">
+            <TextField
+              label="Tu email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="vos@ejemplo.com"
+              value={email}
+              error={emailError}
+              onChange={(event) => {
+                setEmail(event.target.value)
+                if (emailError) setEmailError(undefined)
+              }}
+            />
+            <TextField
+              label="Tu contraseña"
+              type="password"
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              placeholder="Al menos 8 caracteres"
+              value={password}
+              error={passwordError}
+              onChange={(event) => {
+                setPassword(event.target.value)
+                if (passwordError) setPasswordError(undefined)
+              }}
+            />
+            <Button type="submit" size="lg" block loading={busy === 'form'}>
+              {mode === 'signup' ? 'Crear cuenta' : 'Entrar'}
+            </Button>
+          </form>
+
+          <p className="mt-4 text-[0.875rem] text-[var(--ink-2)]">
+            {mode === 'signup' ? '¿Ya tenés cuenta?' : '¿Todavía no tenés cuenta?'}{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === 'signup' ? 'signin' : 'signup')
+                setEmailError(undefined)
+                setPasswordError(undefined)
+              }}
+              className="font-semibold text-[var(--accent-ink)] underline underline-offset-2"
+            >
+              {mode === 'signup' ? 'Entrá' : 'Creá una'}
+            </button>
+          </p>
+
+          {import.meta.env.DEV && (
+            <DevQuickLogin onPick={(value) => void onQuickLogin(value)} busy={busy} />
+          )}
+        </div>
       </main>
     </div>
   )

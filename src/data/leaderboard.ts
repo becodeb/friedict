@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { apiGet } from '@/lib/api'
 import { qk } from './keys'
 import type { ActivityEvent, LeaderboardRowData, Profile } from '@/lib/types'
 
@@ -12,15 +12,8 @@ export function useLeaderboard(groupId: string | undefined) {
     queryKey: qk.leaderboard(groupId ?? ''),
     enabled: Boolean(groupId),
     queryFn: async (): Promise<LeaderboardEntry[]> => {
-      const { data, error } = await supabase
-        .from('group_leaderboard')
-        .select('*')
-        .eq('group_id', groupId!)
-        .order('position', { ascending: true })
-        .order('display_name', { ascending: true })
-      if (error) throw error
-
-      return (data ?? []).map((row) => ({
+      const rows = await apiGet<LeaderboardRowData[]>(`/groups/${groupId!}/leaderboard`)
+      return rows.map((row) => ({
         ...row,
         // Sin predicciones resueltas no hay porcentaje. Mostrar "0%" sería
         // inventar un dato que todavía no existe.
@@ -42,16 +35,8 @@ export function useActivity(groupId: string | undefined, limit = 40) {
   return useQuery({
     queryKey: qk.activity(groupId ?? ''),
     enabled: Boolean(groupId),
-    queryFn: async (): Promise<ActivityWithActor[]> => {
-      const { data, error } = await supabase
-        .from('activity_events')
-        .select('*, actor:profiles(id, display_name, avatar_seed, accent)')
-        .eq('group_id', groupId!)
-        .order('created_at', { ascending: false })
-        .limit(limit)
-      if (error) throw error
-      return (data ?? []) as unknown as ActivityWithActor[]
-    },
+    queryFn: () =>
+      apiGet<ActivityWithActor[]>(`/groups/${groupId!}/activity?limit=${limit}`),
     staleTime: 20_000,
   })
 }

@@ -1,0 +1,60 @@
+# ============================================================================
+# friedict — producción (Coolify)
+# ----------------------------------------------------------------------------
+# Dos servicios: Postgres y la app. Nada más. La base NO publica puertos: sólo
+# se llega a ella desde la red interna de Docker, así que el único punto de
+# entrada desde afuera es la app, y a esa la expone Coolify por su proxy.
+#
+# Variables que hay que cargar en Coolify (Environment Variables):
+#   POSTGRES_PASSWORD  contraseña del superusuario de la base
+#   APP_DB_PASSWORD    contraseña del rol con el que la app consulta
+#   JWT_SECRET         firma las cookies de sesión (openssl rand -base64 48)
+#   SERVICE_FQDN_APP   lo pone Coolify solo al asignar el dominio
+# Opcionales, para el ingreso con Google:
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+# ============================================================================
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+      POSTGRES_DB: friedict
+    volumes:
+      - friedict-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d friedict']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      # El superusuario sólo se usa para migrar y para crear el rol de la app.
+      ADMIN_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/friedict
+      # El rol con el que se atienden las peticiones: NO es superusuario y NO
+      # es dueño de las tablas. Si lo fuera, Postgres le saltearía la RLS y
+      # toda la seguridad del producto quedaría en la nada.
+      DATABASE_URL: postgresql://friedict_app:${APP_DB_PASSWORD:?falta APP_DB_PASSWORD}@db:5432/friedict
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET}
+      PUBLIC_ORIGIN: ${SERVICE_FQDN_APP:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Carga los datos de ejemplo si la base está vacía. Dejarlo en 0 salvo
+      # que se quiera una demo con contenido.
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-0}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - '8080'
+
+volumes:
+  friedict-db:

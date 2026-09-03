@@ -56,6 +56,13 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
   {
+    // El servidor corre sin interfaz: sus logs SON su forma de contar qué está
+    // pasando. Prohibirle console.log ahí no protege de nada.
+    files: ['server/**/*.ts'],
+    languageOptions: { globals: { ...globals.node } },
+    rules: { 'no-console': 'off' },
+  },
+  {
     files: ['e2e/**/*.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'src/test/**/*.ts'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: { 'no-console': 'off' },

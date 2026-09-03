@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+.git
+.env
+.env.local
+.env.*.local
+screenshots
+test-results
+playwright-report
+blob-report
+coverage
+supabase/.temp
+supabase/.branches
+.claude

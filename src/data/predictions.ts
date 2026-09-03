@@ -1,38 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { apiGet, rpc } from '@/lib/api'
 import { qk } from './keys'
 import type {
   CastVoteResult,
   ConfirmResolutionResult,
   OptionWithTally,
   Prediction,
+  PredictionOption,
+  PredictionRow,
   PredictionTemplate,
   Resolution,
   ResolutionConfirmation,
   TimelinePoint,
   Vote,
 } from '@/lib/types'
-import type { Database } from '@/lib/database.types'
 
 /**
- * `predictions` y `prediction_options` están unidas por DOS claves foráneas
- * (la opción pertenece a la predicción, y la predicción apunta a la opción
- * ganadora). PostgREST no puede adivinar cuál usar, así que cada embed nombra
- * su constraint explícitamente.
+ * La forma en que el servidor devuelve una predicción: la fila más las
+ * opciones (con su recuento), los votos visibles y el autor, todo armado con
+ * agregación JSON en una sola consulta.
+ *
+ * `tally` llega en null cuando `results_visibility` todavía no deja verlo, y
+ * `votes` trae sólo lo que la RLS permitió. Eso lo decide la base, no el
+ * servidor: acá nunca aparece nada que no se pueda ver.
  */
-const PREDICTION_SELECT = `
-  *,
-  options:prediction_options!prediction_options_prediction_id_fkey(
-    id, prediction_id, label, position, member_id, created_by, created_at,
-    tally:prediction_option_tallies(vote_count, voter_count)
-  ),
-  votes:prediction_votes(id, prediction_id, option_id, user_id, cycle, created_at, updated_at),
-  author:profiles!predictions_created_by_fkey(id, display_name, avatar_seed, accent)
-` as const
-
-type RawPrediction = Database['public']['Tables']['predictions']['Row'] & {
+interface RawPrediction extends PredictionRow {
   options: Array<
-    Database['public']['Tables']['prediction_options']['Row'] & {
+    PredictionOption & {
       tally: { vote_count: number; voter_count: number } | null
     }
   >
@@ -41,9 +35,9 @@ type RawPrediction = Database['public']['Tables']['predictions']['Row'] & {
 }
 
 /**
- * Normaliza lo que devuelve PostgREST.
+ * Normaliza lo que devuelve la API.
  *
- * `votes` no es "mis votos": es lo que la RLS me deja ver. Con la predicción
+ * `votes` no es "mis votos": es lo que la RLS me dejó ver. Con la predicción
  * abierta eso son exactamente mis votos; después del cierre son todos. Por eso
  * `myVotes` se filtra por usuario acá y no se asume nada del backend.
  */
@@ -56,9 +50,7 @@ function mapPrediction(raw: RawPrediction, userId: string | null): Prediction {
     }))
 
   const myVotes = userId
-    ? raw.votes
-        .filter((v) => v.user_id === userId)
-        .sort((a, b) => a.cycle - b.cycle)
+    ? raw.votes.filter((v) => v.user_id === userId).sort((a, b) => a.cycle - b.cycle)
     : []
 
   return {
@@ -76,19 +68,14 @@ export function usePredictions(groupId: string | undefined, userId: string | nul
     queryKey: qk.predictions(groupId ?? ''),
     enabled: Boolean(groupId),
     queryFn: async (): Promise<Prediction[]> => {
-      // Tercera vía de la expiración: además del cron y de las validaciones en
-      // cast_vote, abrir el feed reevalúa los estados por tiempo. Es idempotente
-      // y barato, y garantiza que nunca se vea una predicción vencida como viva.
-      await supabase.rpc('finalize_predictions', { p_group_id: groupId! })
+      // Tercera vía de la expiración: además del intervalo del servidor y de
+      // las validaciones en cast_vote, abrir el feed reevalúa los estados por
+      // tiempo. Es idempotente y barato, y garantiza que nunca se vea una
+      // predicción vencida como viva.
+      await rpc<number>('finalize_predictions', { p_group_id: groupId! })
 
-      const { data, error } = await supabase
-        .from('predictions')
-        .select(PREDICTION_SELECT)
-        .eq('group_id', groupId!)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-
-      return (data as unknown as RawPrediction[]).map((row) => mapPrediction(row, userId))
+      const rows = await apiGet<RawPrediction[]>(`/groups/${groupId!}/predictions`)
+      return rows.map((row) => mapPrediction(row, userId))
     },
     staleTime: 15_000,
   })
@@ -99,13 +86,8 @@ export function usePrediction(predictionId: string | undefined, userId: string |
     queryKey: qk.prediction(predictionId ?? ''),
     enabled: Boolean(predictionId),
     queryFn: async (): Promise<Prediction> => {
-      const { data, error } = await supabase
-        .from('predictions')
-        .select(PREDICTION_SELECT)
-        .eq('id', predictionId!)
-        .single()
-      if (error) throw error
-      return mapPrediction(data as unknown as RawPrediction, userId)
+      const raw = await apiGet<RawPrediction>(`/predictions/${predictionId!}`)
+      return mapPrediction(raw, userId)
     },
     staleTime: 10_000,
   })
@@ -114,15 +96,7 @@ export function usePrediction(predictionId: string | undefined, userId: string |
 export function useTemplates() {
   return useQuery({
     queryKey: qk.templates(),
-    queryFn: async (): Promise<PredictionTemplate[]> => {
-      const { data, error } = await supabase
-        .from('prediction_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-      if (error) throw error
-      return data ?? []
-    },
+    queryFn: () => apiGet<PredictionTemplate[]>('/templates'),
     staleTime: 10 * 60_000,
   })
 }
@@ -147,14 +121,11 @@ export function useCastVote(userId: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ predictionId, optionId }: CastVoteVars) => {
-      const { data, error } = await supabase.rpc('cast_vote', {
+    mutationFn: ({ predictionId, optionId }: CastVoteVars) =>
+      rpc<CastVoteResult>('cast_vote', {
         p_prediction_id: predictionId,
         p_option_id: optionId,
-      })
-      if (error) throw error
-      return data as unknown as CastVoteResult
-    },
+      }),
 
     onMutate: async ({ predictionId, optionId, groupId }) => {
       await queryClient.cancelQueries({ queryKey: qk.predictions(groupId) })
@@ -188,16 +159,14 @@ export function useCastVote(userId: string | null) {
           participant_count: alreadyVoted
             ? prediction.participant_count
             : prediction.participant_count + 1,
-          vote_count: isSingle && alreadyVoted
-            ? prediction.vote_count
-            : prediction.vote_count + 1,
+          vote_count:
+            isSingle && alreadyVoted ? prediction.vote_count : prediction.vote_count + 1,
           options: prediction.options.map((option) => {
             // Los recuentos ocultos siguen ocultos: no se inventa un número que
             // la persona no tiene derecho a ver.
             if (!option.tally) return option
             const gained = option.id === optionId
-            const lost =
-              isSingle && prediction.myVote?.option_id === option.id && !gained
+            const lost = isSingle && prediction.myVote?.option_id === option.id && !gained
             if (!gained && !lost) return option
             return {
               ...option,
@@ -262,11 +231,11 @@ export interface CreatePredictionVars {
 export function useCreatePrediction() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: CreatePredictionVars): Promise<string> => {
+    mutationFn: (vars: CreatePredictionVars) =>
       // Los parámetros opcionales se OMITEN en lugar de mandarse en null: así
       // toma el default declarado en la función SQL y no hay dos fuentes de
       // verdad para el mismo valor.
-      const { data, error } = await supabase.rpc('create_prediction', {
+      rpc<string>('create_prediction', {
         p_group_id: vars.groupId,
         p_title: vars.title,
         p_options: vars.optionType === 'members' ? [] : vars.options,
@@ -282,10 +251,7 @@ export function useCreatePrediction() {
         ...(vars.votingMode === 'recurring'
           ? { p_vote_interval: `${vars.intervalDays ?? 7} days` }
           : {}),
-      })
-      if (error) throw error
-      return data as unknown as string
-    },
+      }),
     onSuccess: (_id, vars) => {
       void queryClient.invalidateQueries({ queryKey: qk.predictions(vars.groupId) })
       void queryClient.invalidateQueries({ queryKey: qk.activity(vars.groupId) })
@@ -296,20 +262,13 @@ export function useCreatePrediction() {
 export function useCreateFromTemplate() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: {
-      groupId: string
-      templateId: string
-      closesAt: string
-    }): Promise<string> => {
-      const { data, error } = await supabase.rpc('create_prediction_from_template', {
+    mutationFn: (vars: { groupId: string; templateId: string; closesAt: string }) =>
+      rpc<string>('create_prediction_from_template', {
         p_group_id: vars.groupId,
         p_template_id: vars.templateId,
         p_closes_at: vars.closesAt,
         p_qualification_hours: 48,
-      })
-      if (error) throw error
-      return data as unknown as string
-    },
+      }),
     onSuccess: (_id, vars) => {
       void queryClient.invalidateQueries({ queryKey: qk.predictions(vars.groupId) })
       void queryClient.invalidateQueries({ queryKey: qk.activity(vars.groupId) })
@@ -320,13 +279,11 @@ export function useCreateFromTemplate() {
 export function useAddOption(groupId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: { predictionId: string; label: string }) => {
-      const { error } = await supabase.rpc('add_prediction_option', {
+    mutationFn: (vars: { predictionId: string; label: string }) =>
+      rpc<PredictionOption>('add_prediction_option', {
         p_prediction_id: vars.predictionId,
         p_label: vars.label,
-      })
-      if (error) throw error
-    },
+      }),
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: qk.prediction(vars.predictionId) })
       void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
@@ -337,12 +294,8 @@ export function useAddOption(groupId: string) {
 export function useCancelPrediction(groupId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (predictionId: string) => {
-      const { error } = await supabase.rpc('cancel_prediction', {
-        p_prediction_id: predictionId,
-      })
-      if (error) throw error
-    },
+    mutationFn: (predictionId: string) =>
+      rpc<void>('cancel_prediction', { p_prediction_id: predictionId }),
     onSuccess: (_data, predictionId) => {
       void queryClient.invalidateQueries({ queryKey: qk.prediction(predictionId) })
       void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
@@ -362,16 +315,8 @@ export function useResolution(predictionId: string | undefined) {
   return useQuery({
     queryKey: qk.resolution(predictionId ?? ''),
     enabled: Boolean(predictionId),
-    queryFn: async (): Promise<ResolutionWithConfirmations | null> => {
-      const { data, error } = await supabase
-        .from('prediction_resolutions')
-        .select('*, confirmations:resolution_confirmations(*)')
-        .eq('prediction_id', predictionId!)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      if (error) throw error
-      return (data?.[0] as unknown as ResolutionWithConfirmations) ?? null
-    },
+    queryFn: () =>
+      apiGet<ResolutionWithConfirmations | null>(`/predictions/${predictionId!}/resolution`),
     staleTime: 10_000,
   })
 }
@@ -379,14 +324,11 @@ export function useResolution(predictionId: string | undefined) {
 export function useProposeResolution(groupId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: { predictionId: string; optionId: string }) => {
-      const { data, error } = await supabase.rpc('propose_resolution', {
+    mutationFn: (vars: { predictionId: string; optionId: string }) =>
+      rpc<string>('propose_resolution', {
         p_prediction_id: vars.predictionId,
         p_option_id: vars.optionId,
-      })
-      if (error) throw error
-      return data as unknown as string
-    },
+      }),
     onSuccess: (_id, vars) => {
       void queryClient.invalidateQueries({ queryKey: qk.resolution(vars.predictionId) })
       void queryClient.invalidateQueries({ queryKey: qk.prediction(vars.predictionId) })
@@ -398,14 +340,11 @@ export function useProposeResolution(groupId: string) {
 export function useConfirmResolution(groupId: string, predictionId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: { resolutionId: string; agrees: boolean }) => {
-      const { data, error } = await supabase.rpc('confirm_resolution', {
+    mutationFn: (vars: { resolutionId: string; agrees: boolean }) =>
+      rpc<ConfirmResolutionResult>('confirm_resolution', {
         p_resolution_id: vars.resolutionId,
         p_agrees: vars.agrees,
-      })
-      if (error) throw error
-      return data as unknown as ConfirmResolutionResult
-    },
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: qk.resolution(predictionId) })
       void queryClient.invalidateQueries({ queryKey: qk.prediction(predictionId) })
@@ -430,17 +369,7 @@ export function usePredictionScores(predictionId: string | undefined, enabled: b
   return useQuery({
     queryKey: qk.scores(predictionId ?? ''),
     enabled: Boolean(predictionId) && enabled,
-    queryFn: async (): Promise<PredictionScoreRow[]> => {
-      const { data, error } = await supabase
-        .from('prediction_scores')
-        .select(
-          'user_id, points, correct, rarity_multiplier, early_multiplier, conviction_multiplier, profile:profiles(id, display_name, avatar_seed, accent)',
-        )
-        .eq('prediction_id', predictionId!)
-        .order('points', { ascending: false })
-      if (error) throw error
-      return (data ?? []) as unknown as PredictionScoreRow[]
-    },
+    queryFn: () => apiGet<PredictionScoreRow[]>(`/predictions/${predictionId!}/scores`),
     staleTime: 60_000,
   })
 }
@@ -453,13 +382,7 @@ export function useVoteTimeline(predictionId: string | undefined, enabled: boole
   return useQuery({
     queryKey: qk.timeline(predictionId ?? ''),
     enabled: Boolean(predictionId) && enabled,
-    queryFn: async (): Promise<TimelinePoint[]> => {
-      const { data, error } = await supabase.rpc('vote_timeline', {
-        p_prediction_id: predictionId!,
-      })
-      if (error) throw error
-      return (data ?? []) as unknown as TimelinePoint[]
-    },
+    queryFn: () => rpc<TimelinePoint[]>('vote_timeline', { p_prediction_id: predictionId! }),
     staleTime: 30_000,
     retry: false,
   })

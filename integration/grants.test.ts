@@ -42,10 +42,28 @@ const RPC_PUBLICA = new Set([
   'can_see_votes',
   'calculate_points',
   'current_cycle',
+  // Identidad: la lee cada política RLS, así que tiene que ser ejecutable.
+  'current_user_id',
+  // Autenticación. Viven acá y no en el servidor para que el rol de la app no
+  // necesite ningún privilegio sobre `public.users`.
+  'auth_find_by_email',
+  'auth_register',
+  'auth_upsert_google',
+  'auth_session_user',
+  'auth_touch_sign_in',
 ])
 
 /** Lo único que tiene sentido llamar sin sesión: la vista previa de un link. */
-const RPC_ANONIMA = new Set(['peek_invite'])
+const RPC_ANONIMA = new Set([
+  'peek_invite',
+  // Quien inicia sesión, por definición, todavía no tiene sesión.
+  'current_user_id',
+  'auth_find_by_email',
+  'auth_register',
+  'auth_upsert_google',
+  'auth_session_user',
+  'auth_touch_sign_in',
+])
 
 interface FunctionRow {
   proname: string

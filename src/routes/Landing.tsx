@@ -24,15 +24,15 @@ import { cn } from '@/lib/cn'
 const EXAMPLE_OPTIONS = ['Sí', 'No', 'Dice que está llegando pero sigue en su casa']
 
 export function Landing() {
-  const { session, loading } = useAuth()
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
-  const { data: groups } = useMyGroups(Boolean(session))
+  const { data: groups } = useMyGroups(Boolean(user))
 
   // Quien ya tiene sesión y grupo no necesita ver la portada.
   useEffect(() => {
-    if (loading || !session || !groups) return
+    if (loading || !user || !groups) return
     if (groups.length > 0 && groups[0]) navigate(`/g/${groups[0].id}`, { replace: true })
-  }, [loading, session, groups, navigate])
+  }, [loading, user, groups, navigate])
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
@@ -44,7 +44,7 @@ export function Landing() {
         <Logo />
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          {!session && (
+          {!user && (
             <Link
               to="/entrar"
               className={cn(
@@ -90,7 +90,7 @@ export function Landing() {
           <RevealLine index={4} className="mt-8">
             <Button
               size="lg"
-              onClick={() => navigate(session ? '/crear-grupo' : '/entrar?next=/crear-grupo')}
+              onClick={() => navigate(user ? '/crear-grupo' : '/entrar?next=/crear-grupo')}
               iconRight={<ArrowRight size={17} weight="bold" />}
             >
               Crear un grupo

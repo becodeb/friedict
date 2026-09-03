@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { apiGet, rpc } from '@/lib/api'
 import { qk } from './keys'
 import type { GroupInvite, InvitePreview } from '@/lib/types'
 
@@ -23,15 +23,7 @@ export function useInvites(groupId: string | undefined, enabled = true) {
     // La RLS de `group_invites` sólo deja leer a owner/admin. Un member que
     // llegue acá recibe una lista vacía, no un error que confirme que existen.
     enabled: Boolean(groupId) && enabled,
-    queryFn: async (): Promise<GroupInvite[]> => {
-      const { data, error } = await supabase
-        .from('group_invites')
-        .select('*')
-        .eq('group_id', groupId!)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data ?? []
-    },
+    queryFn: () => apiGet<GroupInvite[]>(`/groups/${groupId!}/invites`),
     staleTime: 30_000,
   })
 }
@@ -39,16 +31,13 @@ export function useInvites(groupId: string | undefined, enabled = true) {
 export function useCreateInvite(groupId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (expiresInDays: number): Promise<GroupInvite> => {
-      // `p_max_uses` se omite: los links del grupo no tienen tope de usos, sólo
-      // vencimiento y baja manual.
-      const { data, error } = await supabase.rpc('create_invite', {
+    mutationFn: (expiresInDays: number) =>
+      // `p_max_uses` se omite: los links del grupo no tienen tope de usos,
+      // sólo vencimiento y baja manual.
+      rpc<GroupInvite>('create_invite', {
         p_group_id: groupId,
         p_expires_in: `${expiresInDays} days`,
-      })
-      if (error) throw error
-      return data as unknown as GroupInvite
-    },
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: qk.invites(groupId) })
     },
@@ -58,10 +47,7 @@ export function useCreateInvite(groupId: string) {
 export function useRevokeInvite(groupId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (inviteId: string) => {
-      const { error } = await supabase.rpc('revoke_invite', { p_invite_id: inviteId })
-      if (error) throw error
-    },
+    mutationFn: (inviteId: string) => rpc<void>('revoke_invite', { p_invite_id: inviteId }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: qk.invites(groupId) })
     },
@@ -69,8 +55,9 @@ export function useRevokeInvite(groupId: string) {
 }
 
 /**
- * Vista previa de una invitación. Se puede llamar sin sesión: es la pantalla que
- * ve alguien que abre el link desde un chat.
+ * Vista previa de una invitación. Se puede llamar sin sesión: es la pantalla
+ * que ve alguien que abre el link desde un chat, y es la única función de
+ * dominio que el servidor deja invocar sin sesión.
  *
  * Un token inexistente, vencido, revocado o agotado devuelven todos
  * `{ valid: false }` y nada más. Nunca se filtra si el grupo existe.
@@ -79,11 +66,10 @@ export function usePeekInvite(token: string | undefined) {
   return useQuery({
     queryKey: qk.invitePreview(token ?? ''),
     enabled: Boolean(token),
-    queryFn: async (): Promise<InvitePreview> => {
-      const { data, error } = await supabase.rpc('peek_invite', { p_token: token! })
-      if (error) throw error
-      return (data ?? { valid: false }) as unknown as InvitePreview
-    },
+    queryFn: async (): Promise<InvitePreview> =>
+      (await rpc<InvitePreview | null>('peek_invite', { p_token: token! })) ?? {
+        valid: false,
+      },
     retry: false,
     staleTime: 0,
   })
@@ -92,19 +78,12 @@ export function usePeekInvite(token: string | undefined) {
 export function useJoinGroup() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: {
-      token: string
-      displayName: string
-      accent: number
-    }): Promise<string> => {
-      const { data, error } = await supabase.rpc('join_group', {
+    mutationFn: (vars: { token: string; displayName: string; accent: number }) =>
+      rpc<string>('join_group', {
         p_token: vars.token,
         p_display_name: vars.displayName,
         p_accent: vars.accent,
-      })
-      if (error) throw error
-      return data as unknown as string
-    },
+      }),
     onSuccess: (groupId) => {
       void queryClient.invalidateQueries({ queryKey: qk.myGroups() })
       void queryClient.invalidateQueries({ queryKey: qk.members(groupId) })

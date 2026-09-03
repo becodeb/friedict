@@ -1,9 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
   SEED,
-  clearMailbox,
   createPredictionAs,
-  magicLinkFor,
   signInAs,
   useLightTheme,
   voteAs,
@@ -15,7 +13,6 @@ import {
  */
 test.describe('flujo del invitado', () => {
   test('entra por el link, se suma al grupo y vota', async ({ page }) => {
-    await clearMailbox()
     await useLightTheme(page)
     const email = `invitado-${Date.now()}@cantado.test`
 
@@ -27,9 +24,10 @@ test.describe('flujo del invitado', () => {
     await page.getByRole('button', { name: /entrar para sumarme/i }).click()
     await expect(page).toHaveURL(/\/entrar/)
 
+    await page.getByRole('button', { name: /creá una/i }).click()
     await page.getByLabel('Tu email').fill(email)
-    await page.getByRole('button', { name: /mandame el link/i }).click()
-    await page.goto(await magicLinkFor(email))
+    await page.getByLabel('Tu contraseña').fill('unaclavelarga123')
+    await page.getByRole('button', { name: /crear cuenta/i }).click()
 
     // Vuelve a la invitación, ya con sesión: sólo falta el nombre.
     await expect(page).toHaveURL(new RegExp(`/join/${SEED.inviteToken}`))

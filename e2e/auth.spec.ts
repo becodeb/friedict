@@ -1,17 +1,17 @@
 import { expect, test } from '@playwright/test'
-import { clearMailbox, magicLinkFor, useLightTheme } from './support'
+import { useLightTheme } from './support'
 
 /**
- * El recorrido real de autenticación, sin atajos: se escribe el mail en el
- * formulario, se lee el mensaje que llegó al servidor de correo local y se abre
- * el link como lo haría una persona.
+ * El recorrido real de autenticación, sin atajos: se crea una cuenta desde el
+ * formulario, se cierra sesión y se vuelve a entrar con las mismas
+ * credenciales.
+ *
+ * El Magic Link ya no existe —necesitaba un proveedor de mail saliente— así
+ * que lo que se prueba es contraseña. Google no se puede probar acá: implica
+ * salir del sitio hacia un tercero.
  */
-test.describe('entrar con Magic Link', () => {
-  test.beforeEach(async () => {
-    await clearMailbox()
-  })
-
-  test('desde la portada hasta tener sesión, pasando por el mail', async ({ page }) => {
+test.describe('entrar con mail y contraseña', () => {
+  test('crear una cuenta desde la portada deja la sesión iniciada', async ({ page }) => {
     await useLightTheme(page)
     const email = `e2e-${Date.now()}@cantado.test`
 
@@ -21,51 +21,44 @@ test.describe('entrar con Magic Link', () => {
     await page.getByRole('link', { name: 'Entrar' }).click()
     await expect(page).toHaveURL(/\/entrar/)
 
+    await page.getByRole('button', { name: /creá una/i }).click()
     await page.getByLabel('Tu email').fill(email)
-    await page.getByRole('button', { name: /mandame el link/i }).click()
-
-    // La app confirma sin revelar nada de más.
-    await expect(page.getByRole('heading', { name: /te mandamos un link/i })).toBeVisible()
-    await expect(page.getByText(email)).toBeVisible()
-
-    const link = await magicLinkFor(email)
-    await page.goto(link)
+    await page.getByLabel('Tu contraseña').fill('unaclavelarga123')
+    await page.getByRole('button', { name: /crear cuenta/i }).click()
 
     // Sin grupos todavía, la portada es el destino y ya hay sesión.
-    await expect(page).toHaveURL(/\/(entrar)?$|\/$/)
+    await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('link', { name: 'Entrar' })).toHaveCount(0)
   })
 
-  test('un mail inválido no manda nada y se avisa en el campo', async ({ page }) => {
+  test('un mail inválido se avisa en el campo y no manda nada', async ({ page }) => {
     await page.goto('/entrar')
 
     await page.getByLabel('Tu email').fill('esto-no-es-un-mail')
-    await page.getByRole('button', { name: /mandame el link/i }).click()
+    await page.getByLabel('Tu contraseña').fill('unaclavelarga123')
+    await page.getByRole('button', { name: /^entrar$/i }).click()
 
     await expect(page.getByText(/no parece válido/i)).toBeVisible()
-    await expect(page.getByRole('heading', { name: /te mandamos un link/i })).toHaveCount(0)
   })
 
-  test('un link de acceso ya usado no deja entrar dos veces', async ({ page, context }) => {
-    const email = `e2e-once-${Date.now()}@cantado.test`
-
+  test('una contraseña corta se rechaza antes de salir del navegador', async ({ page }) => {
     await page.goto('/entrar')
-    await page.getByLabel('Tu email').fill(email)
-    await page.getByRole('button', { name: /mandame el link/i }).click()
-    await expect(page.getByRole('heading', { name: /te mandamos un link/i })).toBeVisible()
 
-    const link = await magicLinkFor(email)
-    await page.goto(link)
-    await expect(page.getByRole('link', { name: 'Entrar' })).toHaveCount(0)
+    await page.getByLabel('Tu email').fill('alguien@cantado.test')
+    await page.getByLabel('Tu contraseña').fill('corta')
+    await page.getByRole('button', { name: /^entrar$/i }).click()
 
-    // Otro navegador, mismo link: ya se consumió.
-    const fresh = await context.browser()!.newContext()
-    const freshPage = await fresh.newPage()
-    await freshPage.goto(link)
+    await expect(page.getByText(/al menos 8 caracteres/i)).toBeVisible()
+  })
 
-    await expect(
-      freshPage.getByRole('heading', { name: /este link ya no sirve/i }),
-    ).toBeVisible()
-    await fresh.close()
+  test('las credenciales incorrectas no dejan entrar', async ({ page }) => {
+    await page.goto('/entrar')
+
+    await page.getByLabel('Tu email').fill('bauti@cantado.test')
+    await page.getByLabel('Tu contraseña').fill('estanoeslaclave')
+    await page.getByRole('button', { name: /^entrar$/i }).click()
+
+    await expect(page.getByText(/incorrectos/i)).toBeVisible()
+    await expect(page).toHaveURL(/\/entrar/)
   })
 })

@@ -1,0 +1,31 @@
+# ============================================================================
+# friedict — Postgres para desarrollo
+# ----------------------------------------------------------------------------
+# Reemplaza al stack completo de Supabase: ya no hacen falta ocho containers
+# para levantar el proyecto, alcanza con la base. La API, el auth y el realtime
+# los da el servidor de `server/`, que corre con `npm run dev:server`.
+#
+# El puerto está corrido a 54432 (en vez del 5432 por defecto) para poder
+# convivir con otros Postgres levantados en la misma máquina, siguiendo la
+# misma idea que ya tenían los puertos 544xx del stack anterior.
+# ============================================================================
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: friedict-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: friedict
+    ports:
+      - '54432:5432'
+    volumes:
+      - friedict-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d friedict']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  friedict-db-data:

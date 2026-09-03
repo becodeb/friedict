@@ -35,3 +35,9 @@ supabase/signing_keys.json
 
 # Build info
 node_modules/.tmp
+
+# Build y dependencias del servidor
+server/node_modules
+server/dist
+server/public
+server/.env

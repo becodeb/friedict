@@ -1,8 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
   SEED,
-  clearMailbox,
-  magicLinkFor,
+  confirmResolutionAs,
   signInAs,
   sql,
   statusOf,
@@ -19,15 +18,15 @@ test.describe('flujo del creador', () => {
   test('crea un grupo, obtiene un link para compartir y crea una predicción', async ({
     page,
   }) => {
-    await clearMailbox()
     await useLightTheme(page)
     const email = `duenio-${Date.now()}@cantado.test`
 
     // Entrar
     await page.goto('/entrar')
+    await page.getByRole('button', { name: /creá una/i }).click()
     await page.getByLabel('Tu email').fill(email)
-    await page.getByRole('button', { name: /mandame el link/i }).click()
-    await page.goto(await magicLinkFor(email))
+    await page.getByLabel('Tu contraseña').fill('unaclavelarga123')
+    await page.getByRole('button', { name: /crear cuenta/i }).click()
 
     // Crear el grupo
     await page.getByRole('button', { name: /crear un grupo/i }).click()
@@ -107,33 +106,14 @@ test.describe('flujo del creador', () => {
     expect(await statusOf(SEED.cerrada)).toBe('resolving')
 
     // Otra persona confirma y se reparten los puntos.
-    const { createClient } = await import('@supabase/supabase-js')
-    const { SUPABASE_URL, ANON_KEY } = await import('./support')
-    const supabase = createClient(SUPABASE_URL, ANON_KEY, {
-      auth: { persistSession: false },
-    })
-    await supabase.auth.signInWithPassword({
-      email: 'bauti@cantado.test',
-      password: 'cantado123',
-    })
     const resolutions = (await sql(
       "select id from public.prediction_resolutions where prediction_id = $1 and status = 'proposed'",
       [SEED.cerrada],
     )) as Array<{ id: string }>
-    await supabase.rpc('confirm_resolution', {
-      p_resolution_id: resolutions[0]!.id,
-      p_agrees: true,
-    })
-    await supabase.auth.signOut()
+    const resolutionId = resolutions[0]!.id
 
-    await supabase.auth.signInWithPassword({
-      email: 'juan@cantado.test',
-      password: 'cantado123',
-    })
-    await supabase.rpc('confirm_resolution', {
-      p_resolution_id: resolutions[0]!.id,
-      p_agrees: true,
-    })
+    await confirmResolutionAs('bauti@cantado.test', resolutionId)
+    await confirmResolutionAs('juan@cantado.test', resolutionId)
 
     expect(await statusOf(SEED.cerrada)).toBe('resolved')
 

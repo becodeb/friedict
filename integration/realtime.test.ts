@@ -1,172 +1,174 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { RealtimeChannel } from '@supabase/supabase-js'
+import { Client } from 'pg'
 import { createUser, sql, type TestUser } from './helpers'
 
 /**
- * Realtime.
+ * Avisos en vivo.
  *
  * Lo que se comprueba es lo que el producto promete: que el contador de
- * participación se mueva solo en la pantalla de los demás cuando alguien vota, y
- * que el salto de «En prueba» a confirmada llegue sin recargar.
+ * participación se mueva solo en la pantalla de los demás cuando alguien vota,
+ * y que el salto de «En prueba» a confirmada llegue sin recargar.
  *
  * También se comprueba lo que NO tiene que pasar: que los votos ajenos no
- * viajen por Realtime antes del cierre. `prediction_votes` está deliberadamente
- * fuera de la publicación.
+ * viajen por el canal antes del cierre. `prediction_votes` no dispara ningún
+ * trigger de aviso, a propósito.
+ *
+ * El transporte cambió —antes era la publicación lógica que leía Supabase
+ * Realtime, ahora son triggers con `pg_notify` que el servidor reenvía por
+ * WebSocket— pero la promesa es la misma, así que estos tests siguen mirando
+ * lo mismo: se escucha el canal `friedict` directo desde Postgres, que es la
+ * fuente de todo lo que después sale por el socket.
  */
-function waitFor<T>(
-  predicate: (payload: T) => boolean,
-  register: (handler: (payload: T) => void) => void,
-  timeoutMs = 12_000,
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`No llegó ningún evento en ${timeoutMs}ms`)),
-      timeoutMs,
-    )
-    register((payload) => {
-      if (!predicate(payload)) return
-      clearTimeout(timer)
-      resolve(payload)
-    })
-  })
+const ADMIN_URL =
+  process.env.ADMIN_DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54432/friedict'
+
+interface Aviso {
+  table: string
+  event: string
+  group_id: string
+  prediction_id?: string
+  status?: string
+  previous_status?: string | null
+  participant_count?: number
 }
 
-describe('Realtime', () => {
+/** Escucha el canal y va guardando todo lo que llega. */
+class Escucha {
+  private client = new Client({ connectionString: ADMIN_URL })
+  readonly avisos: Aviso[] = []
+
+  async start(): Promise<void> {
+    await this.client.connect()
+    this.client.on('notification', (message) => {
+      if (message.payload) this.avisos.push(JSON.parse(message.payload) as Aviso)
+    })
+    await this.client.query('listen friedict')
+  }
+
+  async stop(): Promise<void> {
+    await this.client.end()
+  }
+
+  /** Espera a que llegue un aviso que cumpla la condición. */
+  async waitFor(predicate: (aviso: Aviso) => boolean, timeoutMs = 8000): Promise<Aviso> {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      const found = this.avisos.find(predicate)
+      if (found) return found
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    throw new Error(`No llegó ningún aviso que cumpla la condición en ${timeoutMs}ms`)
+  }
+}
+
+describe('avisos en vivo', () => {
   let ana: TestUser
   let beto: TestUser
   let cami: TestUser
   let groupId: string
-  let channels: RealtimeChannel[] = []
+  let predictionId: string
+  let optionIds: string[]
+  const escucha = new Escucha()
 
   beforeAll(async () => {
+    await escucha.start()
     ;[ana, beto, cami] = await Promise.all([
       createUser('rt-ana'),
       createUser('rt-beto'),
       createUser('rt-cami'),
     ])
 
-    const { data: group } = await ana.client.rpc('create_group', {
-      p_name: 'Fútbol 5 (realtime)',
+    const { data: group } = await ana.client.rpc<{ id: string }>('create_group', {
+      p_name: 'Fútbol 5 (avisos)',
       p_display_name: 'Ana',
     })
-    groupId = (group as unknown as { id: string }).id
+    groupId = group!.id
 
-    const { data: invite } = await ana.client.rpc('create_invite', {
+    const { data: invite } = await ana.client.rpc<{ token: string }>('create_invite', {
       p_group_id: groupId,
       p_expires_in: '1 day',
     })
-    const token = (invite as unknown as { token: string }).token
+    const token = invite!.token
 
     await beto.client.rpc('join_group', { p_token: token, p_display_name: 'Beto' })
     await cami.client.rpc('join_group', { p_token: token, p_display_name: 'Cami' })
-  }, 30_000)
 
-  afterAll(async () => {
-    await Promise.all(channels.map((channel) => ana.client.removeChannel(channel)))
-    channels = []
+    const { data: id } = await ana.client.rpc<string>('create_prediction', {
+      p_group_id: groupId,
+      p_title: '¿Llegamos a las 3 personas?',
+      p_options: ['Sí', 'No'],
+      p_closes_at: new Date(Date.now() + 48 * 3_600_000).toISOString(),
+    })
+    predictionId = id!
+
+    const options = await sql<{ id: string }>(
+      'select id from public.prediction_options where prediction_id = $1 order by position',
+      [predictionId],
+    )
+    optionIds = options.map((option) => option.id)
   })
 
-  it('la publicación incluye lo que la UI necesita y excluye los votos', async () => {
-    const rows = (await sql(`
-      select c.relname
-        from pg_publication_tables t
-        join pg_class c on c.relname = t.tablename
-        join pg_namespace n on n.oid = c.relnamespace and n.nspname = t.schemaname
-       where t.pubname = 'supabase_realtime' and t.schemaname = 'public'
-       order by c.relname
-    `)) as Array<{ relname: string }>
-
-    const tables = rows.map((r) => r.relname)
-
-    expect(tables).toContain('predictions')
-    expect(tables).toContain('prediction_option_tallies')
-    expect(tables).toContain('group_members')
-    expect(tables).toContain('activity_events')
-    expect(tables).toContain('prediction_scores')
-
-    // Clave: los votos individuales NUNCA se publican.
-    expect(tables).not.toContain('prediction_votes')
+  afterAll(async () => {
+    await escucha.stop()
   })
 
   it('avisa a los demás cuando una predicción alcanza las 3 personas', async () => {
-    const { data } = await ana.client.rpc('create_prediction', {
-      p_group_id: groupId,
-      p_title: '¿Se suspende por lluvia?',
-      p_options: ['Sí', 'No'],
-      p_closes_at: new Date(Date.now() + 86_400_000).toISOString(),
-    })
-    const predictionId = data as unknown as string
-
-    const options = (await sql(
-      'select id from public.prediction_options where prediction_id = $1 order by position',
-      [predictionId],
-    )) as Array<{ id: string }>
-
-    // Cami mira el feed; no vota.
-    const seen: Array<{ status: string; participant_count: number }> = []
-    const channel = cami.client.channel(`test-group:${groupId}`)
-    channels.push(channel)
-
-    const qualified = waitFor<{ status: string; participant_count: number }>(
-      (row) => row.status === 'active',
-      (handler) => {
-        channel
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'predictions',
-              filter: `group_id=eq.${groupId}`,
-            },
-            (payload) => {
-              const row = payload.new as { status: string; participant_count: number }
-              seen.push(row)
-              handler(row)
-            },
-          )
-          .subscribe()
-      },
-    )
-
-    // Espera a que la suscripción esté realmente activa antes de votar.
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
     await ana.client.rpc('cast_vote', {
       p_prediction_id: predictionId,
-      p_option_id: options[0]!.id,
+      p_option_id: optionIds[0],
     })
     await beto.client.rpc('cast_vote', {
       p_prediction_id: predictionId,
-      p_option_id: options[1]!.id,
+      p_option_id: optionIds[1],
     })
+
+    // Con la tercera persona pasa de `proposed` a `active`, y ese salto es
+    // justamente el que la UI muestra sin recargar.
     await cami.client.rpc('cast_vote', {
       p_prediction_id: predictionId,
-      p_option_id: options[0]!.id,
+      p_option_id: optionIds[0],
     })
 
-    const final = await qualified
+    const aviso = await escucha.waitFor(
+      (a) =>
+        a.table === 'predictions' &&
+        a.prediction_id === predictionId &&
+        a.status === 'active' &&
+        a.previous_status === 'proposed',
+    )
 
-    expect(final.status).toBe('active')
-    expect(final.participant_count).toBe(3)
+    expect(aviso.group_id).toBe(groupId)
+    expect(aviso.participant_count).toBe(3)
+  })
 
-    // Y por el camino se vio subir el contador, que es lo que hace que la
-    // pantalla diga «2 de 3» sin recargar.
-    expect(seen.map((row) => row.participant_count)).toContain(1)
-  }, 30_000)
+  it('el contador de participación viaja, pero los votos ajenos no', async () => {
+    // Hubo tres votos; ninguno generó un aviso de `prediction_votes`.
+    const deVotos = escucha.avisos.filter((a) => a.table === 'prediction_votes')
+    expect(deVotos).toEqual([])
 
-  it('removeChannel deja el cliente sin canales abiertos', async () => {
-    const channel = ana.client.channel(`test-cleanup:${groupId}`)
-    channel.subscribe()
+    // Lo que sí viaja es el recuento por opción, cuya visibilidad la sigue
+    // decidiendo la RLS cuando el cliente lo va a buscar.
+    const deRecuentos = escucha.avisos.filter(
+      (a) => a.table === 'prediction_option_tallies' && a.prediction_id === predictionId,
+    )
+    expect(deRecuentos.length).toBeGreaterThan(0)
+  })
 
-    await new Promise((resolve) => setTimeout(resolve, 800))
-    expect(ana.client.getChannels().length).toBeGreaterThan(0)
+  it('ningún aviso lleva información secreta', async () => {
+    // El payload es deliberadamente chico: nombres de tabla, ids y el estado.
+    // Nada de quién votó qué, ni de cuántos votos tiene cada opción.
+    for (const aviso of escucha.avisos) {
+      const claves = Object.keys(aviso)
+      expect(claves).not.toContain('user_id')
+      expect(claves).not.toContain('option_id')
+      expect(claves).not.toContain('vote_count')
+    }
+  })
 
-    await ana.client.removeChannel(channel)
-    await new Promise((resolve) => setTimeout(resolve, 300))
-
-    expect(
-      ana.client.getChannels().some((c) => c.topic === `realtime:test-cleanup:${groupId}`),
-    ).toBe(false)
-  }, 20_000)
+  it('avisa cuando entra alguien al grupo', async () => {
+    const aviso = escucha.avisos.find(
+      (a) => a.table === 'group_members' && a.event === 'insert' && a.group_id === groupId,
+    )
+    expect(aviso).toBeTruthy()
+  })
 })

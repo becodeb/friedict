@@ -65,6 +65,17 @@ export default defineConfig({
   server: {
     port: 5183,
     strictPort: true,
+    // En desarrollo el frontend lo sirve Vite y la API el servidor de
+    // `server/`. El proxy hace que compartan origen igual que en producción,
+    // que es lo que necesita la cookie de sesión para viajar.
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8183',
+        changeOrigin: false,
+        // El realtime va por WebSocket sobre la misma ruta.
+        ws: true,
+      },
+    },
   },
   preview: {
     port: 4183,

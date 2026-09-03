@@ -1,31 +1,131 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
 import { qk } from './keys'
 import type { PredictionRow } from '@/lib/types'
 
 /**
  * Realtime.
  *
- * Qué se escucha y qué NO:
+ * Un WebSocket contra el propio servidor, alimentado por LISTEN/NOTIFY de
+ * Postgres. Reemplaza a Supabase Realtime conservando exactamente el mismo
+ * criterio de qué se escucha y qué no:
  *
  *   · `prediction_votes` queda deliberadamente afuera. Sus filas son privadas
- *     hasta el cierre, así que Realtime —que aplica RLS— nunca entregaría los
- *     votos ajenos y los contadores quedarían congelados. En su lugar se
- *     escucha `predictions` (participant_count, status) y
+ *     hasta el cierre. Se escucha `predictions` (participant_count, status) y
  *     `prediction_option_tallies`, que el trigger de votos mantiene al día.
  *     Resultado: la participación se ve en vivo y la elección de cada persona
  *     sigue siendo secreta.
  *
- *   · Los payloads NO se aplican al caché a mano, salvo la fila de `predictions`
- *     que es barata y exacta. Para todo lo demás se invalida la query que
- *     corresponde: es más difícil de romper que reconstruir estado desde
- *     eventos sueltos, y evita quedar desincronizado si se pierde un mensaje.
+ *   · Los avisos NO traen datos: traen "cambió esto". Lo que se hace con
+ *     ellos es invalidar la query que corresponde y volver a pedirla por HTTP,
+ *     donde la RLS decide otra vez qué se puede ver. Es más difícil de romper
+ *     que reconstruir estado desde eventos sueltos, y evita quedar
+ *     desincronizado si se pierde un mensaje.
  *
- *   · Un canal por grupo, montado en el layout del grupo. Crear el canal dentro
- *     de un componente que re-renderiza genera suscripciones duplicadas; por eso
- *     el efecto depende sólo de `groupId` y los callbacks viven en un ref.
+ *   · Una sola conexión para toda la app, compartida entre los hooks. Abrir un
+ *     socket por componente generaría conexiones duplicadas en cada
+ *     re-render.
  */
+
+interface ChangeEvent {
+  table: string
+  event: 'insert' | 'update' | 'delete'
+  group_id: string
+  prediction_id?: string
+  title?: string
+  status?: PredictionRow['status']
+  previous_status?: PredictionRow['status'] | null
+  minimum_participants?: number
+  participant_count?: number
+  created_by?: string
+}
+
+type Listener = (event: ChangeEvent) => void
+
+/**
+ * La conexión compartida.
+ *
+ * Se abre con el primer suscriptor y se cierra con el último. Se reconecta
+ * sola con una espera creciente: sin eso, un servidor que se reinicia dejaría
+ * la app muda para siempre, que es la peor forma de fallar porque nadie la
+ * nota — la pantalla sigue mostrando datos, sólo que viejos.
+ */
+class RealtimeConnection {
+  private socket: WebSocket | null = null
+  private listeners = new Set<Listener>()
+  private groups = new Set<string>()
+  private retries = 0
+  private reconnectTimer: number | undefined
+
+  subscribe(groupId: string, listener: Listener): () => void {
+    this.listeners.add(listener)
+    this.groups.add(groupId)
+    this.connect()
+    this.sendSubscribe(groupId)
+
+    return () => {
+      this.listeners.delete(listener)
+      if (this.listeners.size === 0) {
+        this.groups.clear()
+        this.close()
+      }
+    }
+  }
+
+  private sendSubscribe(groupId: string): void {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: 'subscribe', groupId }))
+    }
+  }
+
+  private connect(): void {
+    if (this.socket && this.socket.readyState <= WebSocket.OPEN) return
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const socket = new WebSocket(`${protocol}//${window.location.host}/api/realtime`)
+    this.socket = socket
+
+    socket.addEventListener('open', () => {
+      this.retries = 0
+      // Al reconectar hay que volver a decir qué grupos se estaban mirando: el
+      // servidor no guarda nada de la conexión anterior.
+      for (const groupId of this.groups) this.sendSubscribe(groupId)
+    })
+
+    socket.addEventListener('message', (message) => {
+      try {
+        const event = JSON.parse(String(message.data)) as ChangeEvent
+        for (const listener of this.listeners) listener(event)
+      } catch {
+        // Un mensaje ilegible no debería tirar abajo la conexión.
+      }
+    })
+
+    socket.addEventListener('close', () => {
+      this.socket = null
+      if (this.listeners.size > 0) this.scheduleReconnect()
+    })
+
+    socket.addEventListener('error', () => socket.close())
+  }
+
+  private scheduleReconnect(): void {
+    window.clearTimeout(this.reconnectTimer)
+    // Espera creciente hasta 15s: reintentar cada 100ms contra un servidor
+    // caído sólo lo empeora.
+    const delay = Math.min(1000 * 2 ** this.retries, 15_000)
+    this.retries += 1
+    this.reconnectTimer = window.setTimeout(() => this.connect(), delay)
+  }
+
+  private close(): void {
+    window.clearTimeout(this.reconnectTimer)
+    this.socket?.close()
+    this.socket = null
+  }
+}
+
+const connection = new RealtimeConnection()
 
 export interface GroupRealtimeHandlers {
   /** Una predicción "En prueba" alcanzó la participación mínima. */
@@ -38,15 +138,32 @@ export interface GroupRealtimeHandlers {
   onNewPrediction?: (prediction: PredictionRow) => void
 }
 
+/**
+ * El aviso trae sólo unos pocos campos, pero los handlers reciben algo con
+ * forma de `PredictionRow` porque es lo que usan para armar el texto del
+ * toast (título y mínimo de participantes). No es la fila completa y no se
+ * usa para pintar: para eso se invalida y se vuelve a pedir.
+ */
+function asPredictionRow(event: ChangeEvent): PredictionRow {
+  return {
+    id: event.prediction_id,
+    title: event.title,
+    status: event.status,
+    minimum_participants: event.minimum_participants,
+    participant_count: event.participant_count,
+    created_by: event.created_by,
+  } as unknown as PredictionRow
+}
+
 export function useGroupRealtime(
   groupId: string | undefined,
   handlers: GroupRealtimeHandlers = {},
 ): void {
   const queryClient = useQueryClient()
 
-  // Los handlers cambian en cada render; el canal no debe. El ref se actualiza
-  // en un efecto y no durante el render: escribir un ref mientras se renderiza
-  // rompe el modo concurrente, donde un render puede descartarse.
+  // Los handlers cambian en cada render; la suscripción no debe. El ref se
+  // actualiza en un efecto y no durante el render: escribir un ref mientras se
+  // renderiza rompe el modo concurrente, donde un render puede descartarse.
   const handlersRef = useRef(handlers)
   useEffect(() => {
     handlersRef.current = handlers
@@ -55,96 +172,53 @@ export function useGroupRealtime(
   useEffect(() => {
     if (!groupId) return
 
-    const channel = supabase
-      .channel(`group:${groupId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'predictions',
-          filter: `group_id=eq.${groupId}`,
-        },
-        (payload) => {
-          const next = payload.new as PredictionRow | undefined
-          const previous = payload.eventType === 'UPDATE'
-            ? (payload.old as Partial<PredictionRow> | undefined)
-            : undefined
+    return connection.subscribe(groupId, (event) => {
+      if (event.group_id !== groupId) return
 
-          if (next?.id) {
-            // Esta fila sí se aplica directo: viene completa y es la que hace
-            // que el contador de participantes se mueva en vivo.
-            queryClient.setQueryData<PredictionRow[]>(
-              qk.predictions(groupId),
-              (current) =>
-                current?.map((p) => (p.id === next.id ? { ...p, ...next } : p)),
-            )
+      if (event.table === 'predictions') {
+        if (event.event === 'insert') {
+          handlersRef.current.onNewPrediction?.(asPredictionRow(event))
+        }
+        if (event.event === 'update' && event.previous_status && event.status) {
+          if (event.previous_status === 'proposed' && event.status === 'active') {
+            handlersRef.current.onQualified?.(asPredictionRow(event))
           }
-
-          if (payload.eventType === 'INSERT' && next) {
-            handlersRef.current.onNewPrediction?.(next)
+          if (event.previous_status !== 'resolved' && event.status === 'resolved') {
+            handlersRef.current.onResolved?.(asPredictionRow(event))
           }
+        }
 
-          if (previous && next) {
-            if (previous.status === 'proposed' && next.status === 'active') {
-              handlersRef.current.onQualified?.(next)
-            }
-            if (previous.status !== 'resolved' && next.status === 'resolved') {
-              handlersRef.current.onResolved?.(next)
-            }
-          }
+        void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
+        if (event.prediction_id) {
+          void queryClient.invalidateQueries({ queryKey: qk.prediction(event.prediction_id) })
+        }
+        return
+      }
 
-          void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
-          if (next?.id) {
-            void queryClient.invalidateQueries({ queryKey: qk.prediction(next.id) })
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'group_members',
-          filter: `group_id=eq.${groupId}`,
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') handlersRef.current.onMemberJoined?.()
-          void queryClient.invalidateQueries({ queryKey: qk.members(groupId) })
-          void queryClient.invalidateQueries({ queryKey: qk.leaderboard(groupId) })
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'activity_events',
-          filter: `group_id=eq.${groupId}`,
-        },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: qk.activity(groupId) })
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'prediction_scores',
-          filter: `group_id=eq.${groupId}`,
-        },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: qk.leaderboard(groupId) })
-        },
-      )
-      .subscribe()
+      if (event.table === 'group_members') {
+        if (event.event === 'insert') handlersRef.current.onMemberJoined?.()
+        void queryClient.invalidateQueries({ queryKey: qk.members(groupId) })
+        void queryClient.invalidateQueries({ queryKey: qk.leaderboard(groupId) })
+        return
+      }
 
-    return () => {
-      // removeChannel desuscribe y libera el canal del cliente. Sin esto, cada
-      // cambio de grupo dejaría un canal huérfano abierto.
-      void supabase.removeChannel(channel)
-    }
+      if (event.table === 'activity_events') {
+        void queryClient.invalidateQueries({ queryKey: qk.activity(groupId) })
+        return
+      }
+
+      if (event.table === 'prediction_scores') {
+        void queryClient.invalidateQueries({ queryKey: qk.leaderboard(groupId) })
+        return
+      }
+
+      if (event.table === 'prediction_option_tallies') {
+        void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
+        if (event.prediction_id) {
+          void queryClient.invalidateQueries({ queryKey: qk.prediction(event.prediction_id) })
+        }
+      }
+    })
   }, [groupId, queryClient])
 }
 
@@ -159,43 +233,22 @@ export function usePredictionRealtime(
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    if (!predictionId) return
+    if (!predictionId || !groupId) return
 
-    const channel = supabase
-      .channel(`prediction:${predictionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'prediction_option_tallies',
-          filter: `prediction_id=eq.${predictionId}`,
-        },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: qk.prediction(predictionId) })
-          void queryClient.invalidateQueries({ queryKey: qk.timeline(predictionId) })
-          if (groupId) {
-            void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'predictions',
-          filter: `id=eq.${predictionId}`,
-        },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: qk.prediction(predictionId) })
-          void queryClient.invalidateQueries({ queryKey: qk.resolution(predictionId) })
-        },
-      )
-      .subscribe()
+    return connection.subscribe(groupId, (event) => {
+      if (event.prediction_id !== predictionId) return
 
-    return () => {
-      void supabase.removeChannel(channel)
-    }
+      if (event.table === 'prediction_option_tallies') {
+        void queryClient.invalidateQueries({ queryKey: qk.prediction(predictionId) })
+        void queryClient.invalidateQueries({ queryKey: qk.timeline(predictionId) })
+        void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
+        return
+      }
+
+      if (event.table === 'predictions') {
+        void queryClient.invalidateQueries({ queryKey: qk.prediction(predictionId) })
+        void queryClient.invalidateQueries({ queryKey: qk.resolution(predictionId) })
+      }
+    })
   }, [predictionId, groupId, queryClient])
 }

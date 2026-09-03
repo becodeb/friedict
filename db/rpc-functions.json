@@ -1,0 +1,64 @@
+{
+  "_comment": "Lista blanca de funciones de dominio invocables por HTTP. Es la ÚNICA fuente de verdad: la usan el servidor (server/src/rpc.ts) y el arnés de tests (integration/helpers.ts). Sin esta lista, el endpoint /api/rpc sería «ejecutá cualquier función de mi base», incluidas las internas como score_prediction. Los tipos no son decorativos: Postgres no puede inferir el tipo de un parámetro suelto cuando el argumento es un enum o un interval.",
+  "functions": {
+    "create_group": {
+      "shape": "row",
+      "params": { "p_name": "text", "p_display_name": "text", "p_avatar_seed": "text", "p_accent": "smallint" }
+    },
+    "upsert_profile": {
+      "shape": "row",
+      "params": { "p_display_name": "text", "p_avatar_seed": "text", "p_accent": "smallint" }
+    },
+    "leave_group": { "shape": "void", "params": { "p_group_id": "uuid" } },
+    "update_member_role": {
+      "shape": "void",
+      "params": { "p_group_id": "uuid", "p_user_id": "uuid", "p_role": "public.member_role" }
+    },
+    "remove_member": { "shape": "void", "params": { "p_group_id": "uuid", "p_user_id": "uuid" } },
+
+    "create_invite": {
+      "shape": "row",
+      "params": { "p_group_id": "uuid", "p_expires_in": "interval", "p_max_uses": "integer" }
+    },
+    "revoke_invite": { "shape": "void", "params": { "p_invite_id": "uuid" } },
+    "peek_invite": { "shape": "scalar", "allowAnonymous": true, "params": { "p_token": "text" } },
+    "join_group": {
+      "shape": "scalar",
+      "params": { "p_token": "text", "p_display_name": "text", "p_avatar_seed": "text", "p_accent": "smallint" }
+    },
+
+    "finalize_predictions": { "shape": "scalar", "params": { "p_group_id": "uuid" } },
+    "create_prediction": {
+      "shape": "scalar",
+      "params": {
+        "p_group_id": "uuid",
+        "p_title": "text",
+        "p_options": "text[]",
+        "p_closes_at": "timestamptz",
+        "p_description": "text",
+        "p_option_type": "public.option_source",
+        "p_voting_mode": "public.voting_mode",
+        "p_vote_interval": "interval",
+        "p_allow_new_options": "boolean",
+        "p_results_visibility": "public.results_visibility",
+        "p_votes_visibility": "public.votes_visibility",
+        "p_minimum_participants": "smallint",
+        "p_qualification_hours": "integer"
+      }
+    },
+    "create_prediction_from_template": {
+      "shape": "scalar",
+      "params": { "p_group_id": "uuid", "p_template_id": "uuid", "p_closes_at": "timestamptz", "p_qualification_hours": "integer" }
+    },
+    "add_prediction_option": {
+      "shape": "row",
+      "params": { "p_prediction_id": "uuid", "p_label": "text" }
+    },
+    "cancel_prediction": { "shape": "void", "params": { "p_prediction_id": "uuid" } },
+
+    "cast_vote": { "shape": "scalar", "params": { "p_prediction_id": "uuid", "p_option_id": "uuid" } },
+    "propose_resolution": { "shape": "scalar", "params": { "p_prediction_id": "uuid", "p_option_id": "uuid" } },
+    "confirm_resolution": { "shape": "scalar", "params": { "p_resolution_id": "uuid", "p_agrees": "boolean" } },
+    "vote_timeline": { "shape": "table", "params": { "p_prediction_id": "uuid" } }
+  }
+}
