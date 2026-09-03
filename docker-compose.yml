@@ -10,8 +10,14 @@
 #   APP_DB_PASSWORD    contraseña del rol con el que la app consulta
 #   JWT_SECRET         firma las cookies de sesión (openssl rand -base64 48)
 #   SERVICE_FQDN_APP   lo pone Coolify solo al asignar el dominio
+#   SERVICE_URL_APP    ídem, pero con `https://` adelante. Es la que se usa.
 # Opcionales, para el ingreso con Google:
 #   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+#
+# En Google Cloud Console hay que autorizar como redirect URI exactamente
+# `https://<tu-dominio>/api/auth/google/callback`. Y NO le agregues `https://`
+# a `SERVICE_FQDN_APP`: esa variable la usa Coolify para su proxy y para el
+# certificado, y espera un dominio pelado.
 # ============================================================================
 services:
   db:
@@ -44,7 +50,12 @@ services:
       # toda la seguridad del producto quedaría en la nada.
       DATABASE_URL: postgresql://friedict_app:${APP_DB_PASSWORD:?falta APP_DB_PASSWORD}@db:5432/friedict
       JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET}
-      PUBLIC_ORIGIN: ${SERVICE_FQDN_APP:-}
+      # `SERVICE_URL_APP` y NO `SERVICE_FQDN_APP`: el segundo es el dominio
+      # pelado (`friedict.becode.com.ar`) y de ahí salía un redirect_uri sin
+      # `https://`, que Google rechaza con `redirect_uri_mismatch`. El fallback
+      # al FQDN queda por si el despliegue es viejo y no expone la URL: el
+      # servidor le agrega el esquema al normalizar (ver public-origin.ts).
+      PUBLIC_ORIGIN: ${SERVICE_URL_APP:-${SERVICE_FQDN_APP:-}}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       # Carga los datos de ejemplo si la base está vacía. Dejarlo en 0 salvo

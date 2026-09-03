@@ -1,3 +1,5 @@
+import { normalizePublicOrigin } from './public-origin.js'
+
 /**
  * Configuración.
  *
@@ -49,8 +51,13 @@ export const env = {
   /** Treinta días. La sesión de una app de amigos no tiene por qué durar poco. */
   sessionMaxAgeMs: 30 * 24 * 60 * 60 * 1000,
 
-  /** Origen público, para armar el redirect_uri de Google. */
-  publicOrigin: optional('PUBLIC_ORIGIN'),
+  /**
+   * Origen público, para armar el redirect_uri de Google. Se normaliza a URL
+   * absoluta: Coolify expone el dominio pelado en `SERVICE_FQDN_APP` y con
+   * esquema en `SERVICE_URL_APP`, y un dominio sin `https://` rompe el flujo
+   * de OAuth con un `redirect_uri_mismatch` que no dice por qué.
+   */
+  publicOrigin: normalizePublicOrigin(optional('PUBLIC_ORIGIN')),
 
   google:
     googleClientId && googleClientSecret
