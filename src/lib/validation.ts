@@ -40,6 +40,15 @@ export type JoinGroupInput = z.infer<typeof joinGroupSchema>
 
 export const optionLabelSchema = trimmed(1, 60)
 
+const DAY_MS = 86_400_000
+
+/**
+ * Porcentaje de quórum (calificación o cierre): entero entre 1 y 100. El
+ * mismo rango que el `check` de la columna en `600_quorum_and_open_close.sql`
+ * — si alguien saltea el formulario, la base rechaza igual.
+ */
+export const quorumPercentSchema = z.number().int().min(1).max(100)
+
 export const createPredictionSchema = z
   .object({
     title: trimmed(4, 140),
@@ -51,7 +60,12 @@ export const createPredictionSchema = z
     allowNewOptions: z.boolean(),
     resultsVisibility: z.enum(['always', 'after_vote', 'on_close']),
     votesVisibility: z.enum(['visible', 'on_close', 'anonymous']),
-    closesAt: z.string().min(1, 'Elegí cuándo cierra.'),
+    // 'date': cierra en una fecha fija. 'open': cierra cuando el grupo lo
+    // pide (prediction_close_requests). closesAt sólo hace falta en 'date'.
+    closeMode: z.enum(['date', 'open']),
+    closesAt: z.string().optional(),
+    qualificationPercent: quorumPercentSchema,
+    closePercent: quorumPercentSchema,
     qualificationHours: z.number().int().min(1).max(720),
   })
   .superRefine((value, ctx) => {
@@ -73,21 +87,6 @@ export const createPredictionSchema = z
       }
     }
 
-    const closes = new Date(value.closesAt)
-    if (Number.isNaN(closes.getTime())) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['closesAt'],
-        message: 'Esa fecha no es válida.',
-      })
-    } else if (closes.getTime() <= Date.now()) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['closesAt'],
-        message: 'El cierre tiene que ser en el futuro.',
-      })
-    }
-
     if (value.votingMode === 'recurring' && !value.intervalDays) {
       ctx.addIssue({
         code: 'custom',
@@ -95,9 +94,69 @@ export const createPredictionSchema = z
         message: 'Elegí cada cuánto se puede volver a votar.',
       })
     }
+
+    if (value.closeMode === 'open') {
+      // Sin fecha, no hay ventana que validar: una evolutiva abierta produce
+      // rondas indefinidamente, sin techo.
+      return
+    }
+
+    if (!value.closesAt) {
+      ctx.addIssue({ code: 'custom', path: ['closesAt'], message: 'Elegí cuándo cierra.' })
+      return
+    }
+
+    const closes = new Date(value.closesAt)
+    if (Number.isNaN(closes.getTime())) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['closesAt'],
+        message: 'Esa fecha no es válida.',
+      })
+      return
+    }
+    if (closes.getTime() <= Date.now()) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['closesAt'],
+        message: 'El cierre tiene que ser en el futuro.',
+      })
+      return
+    }
+
+    // Evolutiva con fecha: al menos una ronda completa tiene que entrar antes
+    // del cierre, si no la predicción cierra sin haber corrido ni un ciclo.
+    if (value.votingMode === 'recurring' && value.intervalDays) {
+      const windowMs = closes.getTime() - Date.now()
+      const intervalMs = value.intervalDays * DAY_MS
+      if (intervalMs > windowMs) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['intervalDays'],
+          message: 'La ronda no entra ni una vez antes del cierre. Achicala o alejá la fecha.',
+        })
+      }
+    }
   })
 
 export type CreatePredictionInput = z.infer<typeof createPredictionSchema>
+
+/**
+ * Cuántas rondas completas entran entre ahora (la creación, que es desde
+ * donde se cuentan las rondas de una evolutiva) y el cierre. `null` = sin
+ * techo: una evolutiva sin fecha de cierre produce rondas indefinidamente.
+ */
+export function roundsBeforeClose(
+  closesAt: Date | null,
+  intervalDays: number,
+  now: Date = new Date(),
+): number | null {
+  if (closesAt === null) return null
+  const windowMs = closesAt.getTime() - now.getTime()
+  const intervalMs = intervalDays * DAY_MS
+  if (windowMs <= 0 || intervalMs <= 0) return 0
+  return Math.floor(windowMs / intervalMs)
+}
 
 // Se construyen con `new RegExp` y escapes para que este archivo no contenga
 // literalmente los caracteres que justamente queremos eliminar.

@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from '@/auth/useAuth'
 import { Spinner } from '@/components/ui/Spinner'
+import { SeoRobots } from '@/components/SeoRobots'
 import { Landing } from '@/routes/Landing'
 import { Login } from '@/routes/Login'
 import { GroupShell } from '@/components/layout/GroupShell'
@@ -65,6 +66,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 export function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
+      <SeoRobots />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/entrar" element={<Login />} />

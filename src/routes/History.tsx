@@ -84,8 +84,8 @@ export function History() {
       })
       .sort(
         (a, b) =>
-          new Date(b.resolved_at ?? b.closes_at).getTime() -
-          new Date(a.resolved_at ?? a.closes_at).getTime(),
+          new Date(b.resolved_at ?? b.closed_at ?? b.closes_at ?? b.created_at).getTime() -
+          new Date(a.resolved_at ?? a.closed_at ?? a.closes_at ?? a.created_at).getTime(),
       )
   }, [predictions.data])
 
@@ -141,7 +141,12 @@ export function History() {
                             ? 'No juntó gente'
                             : 'Cancelada'}
                         {' · '}
-                        {formatRelative(prediction.resolved_at ?? prediction.closes_at)}
+                        {formatRelative(
+                          prediction.resolved_at ??
+                            prediction.closed_at ??
+                            prediction.closes_at ??
+                            prediction.created_at,
+                        )}
                       </span>
                     </span>
                     {status === 'resolved' && (

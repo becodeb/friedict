@@ -32,15 +32,23 @@ export function participantsMissing(
   return Math.max(0, minimumParticipants - participantCount)
 }
 
-type StatusInput = Pick<
+/**
+ * `required_participants` es OBLIGATORIO, no opcional con un fallback a
+ * `minimum_participants`: un fallback reintroduciría en silencio el bug de
+ * los grupos chicos en cualquier payload que se olvide de mandarlo.
+ * TypeScript obliga a que todo call site lo provea.
+ */
+export type StatusInput = Pick<
   PredictionRow,
-  | 'status'
-  | 'is_default'
-  | 'minimum_participants'
-  | 'participant_count'
-  | 'qualification_deadline'
-  | 'closes_at'
->
+  'status' | 'is_default' | 'participant_count' | 'qualification_deadline' | 'closes_at'
+> & { required_participants: number }
+
+/** `closes_at` nulo = sin cierre por fecha: se trata como "infinitamente lejos". */
+function closesAtMs(prediction: Pick<StatusInput, 'closes_at'>): number {
+  return prediction.closes_at === null
+    ? Number.POSITIVE_INFINITY
+    : toDate(prediction.closes_at).getTime()
+}
 
 /**
  * Estado efectivo en este instante. Mismo orden de evaluación que
@@ -64,9 +72,10 @@ export function effectiveStatus(
 
   const qualified = hasQualified(
     prediction.participant_count,
-    prediction.minimum_participants,
+    prediction.required_participants,
     prediction.is_default,
   )
+  const closesMs = closesAtMs(prediction)
 
   if (status === 'proposed') {
     // 1) venció el plazo sin juntar gente
@@ -75,29 +84,24 @@ export function effectiveStatus(
     }
     // 2) juntó la gente
     if (qualified) {
-      return toDate(prediction.closes_at).getTime() <= now.getTime() ? 'closed' : 'active'
+      return closesMs <= now.getTime() ? 'closed' : 'active'
     }
     // sigue en prueba
-    return toDate(prediction.closes_at).getTime() <= now.getTime() ? 'closed' : 'proposed'
+    return closesMs <= now.getTime() ? 'closed' : 'proposed'
   }
 
-  // 3) llegó el cierre
-  if (status === 'active' && toDate(prediction.closes_at).getTime() <= now.getTime()) {
+  // 3) llegó el cierre. Sin closes_at (Infinity), esta rama nunca dispara: una
+  // predicción abierta jamás cierra sola por fecha, a ningún `now`.
+  if (status === 'active' && closesMs <= now.getTime()) {
     return 'closed'
   }
 
   return status
 }
 
-export function isOpenForVoting(
-  prediction: StatusInput,
-  now: Date = new Date(),
-): boolean {
+export function isOpenForVoting(prediction: StatusInput, now: Date = new Date()): boolean {
   const status = effectiveStatus(prediction, now)
-  return (
-    (status === 'proposed' || status === 'active') &&
-    toDate(prediction.closes_at).getTime() > now.getTime()
-  )
+  return (status === 'proposed' || status === 'active') && closesAtMs(prediction) > now.getTime()
 }
 
 export function isRevealed(status: PredictionStatus): boolean {
@@ -118,6 +122,23 @@ export function canSeeResults(
   if (prediction.results_visibility === 'always') return true
   if (prediction.results_visibility === 'after_vote') return hasVoted
   return false
+}
+
+/**
+ * ¿Se puede ver QUIÉN votó qué? Refleja la política RLS de `prediction_votes`
+ * (`can_see_votes` en `300_rls.sql`). `visible` siempre; `anonymous` nunca;
+ * `on_close` recién al revelarse. Antes de esta función, `votes_visibility
+ * = 'visible'` no tenía ningún efecto observable: el cliente sólo miraba
+ * `revealed`, así que nunca mostraba los nombres antes del cierre aunque la
+ * base ya los dejara pasar.
+ */
+export function canSeeVotes(
+  prediction: Pick<PredictionRow, 'votes_visibility'>,
+  status: PredictionStatus,
+): boolean {
+  if (prediction.votes_visibility === 'anonymous') return false
+  if (prediction.votes_visibility === 'visible') return true
+  return isRevealed(status)
 }
 
 // ---------------------------------------------------------------------------
@@ -166,28 +187,13 @@ export function voteForCurrentCycle(
 export interface VoteAvailability {
   canVote: boolean
   /** Motivo por el que no se puede, para mostrarlo tal cual. */
-  reason:
-    | null
-    | 'closed'
-    | 'cycle_used'
-    | 'not_open_yet'
+  reason: null | 'closed' | 'cycle_used' | 'not_open_yet'
   /** En evolutivas, cuándo se habilita el próximo voto. */
   nextAt: Date | null
 }
 
 export function voteAvailability(
-  prediction: Pick<
-    PredictionRow,
-    | 'status'
-    | 'is_default'
-    | 'minimum_participants'
-    | 'participant_count'
-    | 'qualification_deadline'
-    | 'closes_at'
-    | 'opens_at'
-    | 'vote_interval'
-    | 'voting_mode'
-  >,
+  prediction: StatusInput & Pick<PredictionRow, 'opens_at' | 'vote_interval' | 'voting_mode'>,
   votes: Vote[],
   at: Date = new Date(),
 ): VoteAvailability {
@@ -229,7 +235,9 @@ export function voteAvailability(
 export function feedRank(prediction: Prediction, now: Date = new Date()): number {
   const status = effectiveStatus(prediction, now)
   const availability = voteAvailability(prediction, prediction.myVotes, now)
-  const closesIn = toDate(prediction.closes_at).getTime() - now.getTime()
+  // Sin cierre por fecha, `closesIn` es Infinity: nunca cae en la ventana de
+  // "cierra pronto", que es exactamente lo correcto — no hay nada por vencer.
+  const closesIn = closesAtMs(prediction) - now.getTime()
 
   // 0 = arriba de todo
   if (status === 'proposed' && availability.canVote && !prediction.myVote) return 0
@@ -244,8 +252,34 @@ export function sortFeed(predictions: Prediction[], now: Date = new Date()): Pre
   return [...predictions].sort((a, b) => {
     const rank = feedRank(a, now) - feedRank(b, now)
     if (rank !== 0) return rank
-    return toDate(a.closes_at).getTime() - toDate(b.closes_at).getTime()
+    // Dentro del mismo rango, lo abierto (Infinity) siempre queda último.
+    const diff = closesAtMs(a) - closesAtMs(b)
+    return Number.isNaN(diff) ? 0 : diff
   })
+}
+
+// ---------------------------------------------------------------------------
+// Quórum — mirror puro de required_participants()/required_close_requests()
+// ---------------------------------------------------------------------------
+
+/**
+ * Espejo de `required_participants`/`required_close_requests` en SQL, para
+ * previsualizar en el formulario de creación ANTES de que exista la fila (ahí
+ * no hay ninguna predicción sobre la que pedirle el cálculo al servidor). El
+ * `least(memberCount, …)` es el mismo fix que corrige el bug de los grupos
+ * chicos; nunca se debe quitar acá tampoco.
+ */
+function requiredCountPreview(memberCount: number, percent: number, floor: number): number {
+  const count = Math.max(0, memberCount)
+  return Math.max(floor, Math.min(count, Math.ceil((count * percent) / 100)))
+}
+
+export function requiredParticipantsPreview(memberCount: number, percent: number): number {
+  return requiredCountPreview(memberCount, percent, 1)
+}
+
+export function requiredCloseRequestsPreview(memberCount: number, percent: number): number {
+  return requiredCountPreview(memberCount, percent, 2)
 }
 
 // ---------------------------------------------------------------------------

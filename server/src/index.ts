@@ -10,6 +10,7 @@ import { apiRouter } from './routes.js'
 import { rpcRouter } from './rpc.js'
 import { attachRealtime } from './realtime.js'
 import { runMigrations, runSeed } from './migrate.js'
+import { applyRobotsHeader } from './robots.js'
 
 /**
  * El servidor de friedict.
@@ -75,8 +76,10 @@ app.use(
         res.setHeader('Cache-Control', 'no-cache')
       }
       res.setHeader('X-Content-Type-Options', 'nosniff')
-      // Los grupos son privados: que ningún buscador los indexe.
-      res.setHeader('X-Robots-Tag', 'noindex, nofollow')
+      // Indexación selectiva y default-deny: ver server/src/robots.ts. Los
+      // assets estáticos (imágenes, manifest, íconos) nunca están en la
+      // lista blanca, así que siempre salen noindex acá.
+      applyRobotsHeader(res, filePath.slice(STATIC_DIR.length) || '/')
     },
     index: false,
   }),
@@ -84,9 +87,9 @@ app.use(
 
 // Es una SPA: cualquier ruta que no sea un archivo real devuelve index.html,
 // si no /g/<id>/ranking daría 404 al recargar.
-app.get(/.*/, (_req, res) => {
+app.get(/.*/, (req, res) => {
   res.setHeader('Cache-Control', 'no-cache')
-  res.setHeader('X-Robots-Tag', 'noindex, nofollow')
+  applyRobotsHeader(res, req.path)
   res.sendFile(join(STATIC_DIR, 'index.html'))
 })
 

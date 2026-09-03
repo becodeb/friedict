@@ -9,12 +9,15 @@ import {
   useCastVote,
   usePrediction,
   usePredictionScores,
+  useRequestClose,
   useVoteTimeline,
+  useWithdrawCloseRequest,
 } from '@/data/predictions'
 import { useMembers } from '@/data/groups'
 import { usePredictionRealtime } from '@/data/realtime'
 import {
   canSeeResults,
+  canSeeVotes,
   effectiveStatus,
   isRevealed,
   voteAvailability,
@@ -74,6 +77,8 @@ export function PredictionDetail() {
   const castVote = useCastVote(user?.id ?? null)
   const addOption = useAddOption(groupId)
   const cancelPrediction = useCancelPrediction(groupId)
+  const requestClose = useRequestClose(groupId)
+  const withdrawCloseRequest = useWithdrawCloseRequest(groupId)
 
   const [newOption, setNewOption] = useState('')
   const [celebrated, setCelebrated] = useState(false)
@@ -85,9 +90,25 @@ export function PredictionDetail() {
   const revealed = isRevealed(status)
   const hasVoted = (data?.myVotes.length ?? 0) > 0
   const showResults = data ? canSeeResults(data, status, hasVoted) : false
+  const showVoterNames = data ? canSeeVotes(data, status) : false
   const availability = data
     ? voteAvailability(data, data.myVotes)
     : { canVote: false, reason: null as null, nextAt: null }
+
+  // Selección estagiada: vive acá (el consumidor), no en VoteOption. Se
+  // resetea en el render (no en un efecto) apenas cambia lo que la vuelve
+  // obsoleta: el propio voto aterrizó, el servidor rechazó (rollback) o
+  // cambió el status. Mismo patrón que `celebrated` un poco más abajo.
+  const [staged, setStaged] = useState<string | null>(null)
+  const voteKey = `${data?.myVote?.option_id ?? ''}:${data?.myVote?.cycle ?? ''}:${status}`
+  const [lastVoteKey, setLastVoteKey] = useState(voteKey)
+  if (lastVoteKey !== voteKey) {
+    setLastVoteKey(voteKey)
+    setStaged(null)
+  }
+
+  const stagedOption = data?.options.find((option) => option.id === staged) ?? null
+  const canConfirm = staged !== null && staged !== data?.myVote?.option_id
 
   const scores = usePredictionScores(predictionId, status === 'resolved')
   const timeline = useVoteTimeline(
@@ -144,9 +165,12 @@ export function PredictionDetail() {
     status !== 'resolved' &&
     (isAdmin || (data.created_by === user?.id && data.participant_count === 0))
 
-  // Quién votó qué: sólo llega si la RLS lo permitió.
+  // Quién votó qué: sólo llega si la RLS lo permitió. El gate es
+  // canSeeVotes() y no `revealed` a secas — con votes_visibility='visible'
+  // hay que mostrar los nombres ANTES del cierre; antes de este cambio el
+  // bloque nunca se dibujaba hasta revelarse, sin importar la configuración.
   const votesByOption = new Map<string, string[]>()
-  if (revealed && data.votes.length > 0) {
+  if (showVoterNames && data.votes.length > 0) {
     for (const vote of data.votes) {
       const name =
         members.data?.find((member) => member.user_id === vote.user_id)?.profile
@@ -178,9 +202,14 @@ export function PredictionDetail() {
 
         <div className="flex flex-wrap items-center gap-2">
           <PredictionStatusLabel status={status} tilt={-2} />
-          {!revealed && status !== 'expired' && (
+          {!revealed && status !== 'expired' && data.closes_at !== null && (
             <Sticker tilt={2}>
               <Countdown target={data.closes_at} prefix="cierra en" />
+            </Sticker>
+          )}
+          {!revealed && status !== 'expired' && data.closes_at === null && (
+            <Sticker tone="sky" tilt={2}>
+              sin fecha de cierre
             </Sticker>
           )}
           {data.voting_mode === 'recurring' && (
@@ -203,9 +232,23 @@ export function PredictionDetail() {
           {data.author ? `La propuso ${data.author.display_name}` : 'Propuesta del sistema'}
           {' · '}
           {formatRelative(data.created_at)}
-          {' · '}
-          {revealed ? 'cerró el ' : 'cierra el '}
-          {formatDateTime(data.closes_at)}
+          {data.closes_at !== null ? (
+            <>
+              {' · '}
+              {revealed ? 'cerró el ' : 'cierra el '}
+              {formatDateTime(data.closes_at)}
+            </>
+          ) : revealed && data.closed_at !== null ? (
+            <>
+              {' · '}
+              cerró el {formatDateTime(data.closed_at)}
+            </>
+          ) : (
+            <>
+              {' · '}
+              cierra cuando lo pida el grupo
+            </>
+          )}
         </p>
 
         {/* Opciones */}
@@ -215,23 +258,13 @@ export function PredictionDetail() {
               <VoteOption
                 option={option}
                 selected={data.myVote?.option_id === option.id}
+                staged={staged === option.id}
                 disabled={!availability.canVote || castVote.isPending}
                 showResults={showResults}
                 totalVotes={totalVotes}
                 isWinner={data.resolved_option_id === option.id}
                 pending={castVote.isPending}
-                onSelect={() =>
-                  castVote.mutate(
-                    { predictionId: data.id, optionId: option.id, groupId },
-                    {
-                      onError: (error) =>
-                        toast.show({
-                          message: friendlyError(error, 'No pudimos guardar tu voto.'),
-                          tone: 'error',
-                        }),
-                    },
-                  )
-                }
+                onSelect={() => setStaged(option.id)}
               />
               {votesByOption.has(option.id) && (
                 <p className="mt-1 pl-4 type-micro text-[var(--ink-3)]">
@@ -242,17 +275,50 @@ export function PredictionDetail() {
           ))}
         </div>
 
+        {/* Confirmar el voto estagiado: paso explícito, aparte del tap. */}
+        {availability.canVote && (
+          <div className="mt-3">
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!canConfirm}
+              loading={castVote.isPending}
+              onClick={() => {
+                if (!staged) return
+                castVote.mutate(
+                  { predictionId: data.id, optionId: staged, groupId },
+                  {
+                    onError: (error) =>
+                      toast.show({
+                        message: friendlyError(error, 'No pudimos guardar tu voto.'),
+                        tone: 'error',
+                      }),
+                  },
+                )
+              }}
+            >
+              {data.myVote ? 'Cambiar mi voto' : 'Confirmar'}
+            </Button>
+            {stagedOption && (
+              <p role="status" className="mt-1.5 type-micro text-[var(--ink-3)]">
+                Elegiste «{stagedOption.label}». Confirmá para guardarlo.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Estado de participación / voto */}
         <div className="mt-4">
           {status === 'proposed' ? (
             <ParticipationThreshold
               participantCount={data.participant_count}
-              minimumParticipants={data.minimum_participants}
+              requiredParticipants={data.required_participants}
+              memberCount={data.member_count}
               qualified={false}
             />
           ) : status === 'expired' ? (
             <p className="text-[0.875rem] text-[var(--ink-3)]">
-              Se venció el plazo sin juntar {data.minimum_participants} personas, así
+              Se venció el plazo sin juntar {data.required_participants} personas, así
               que quedó afuera.
             </p>
           ) : availability.reason === 'cycle_used' && availability.nextAt ? (
@@ -274,6 +340,63 @@ export function PredictionDetail() {
             </p>
           ) : null}
         </div>
+
+        {/* Pedir el cierre: sólo tiene sentido sin fecha, y sólo lo pide
+            quien ya votó (la base lo exige igual; acá se refleja para no
+            mostrar un botón que el servidor va a rechazar). */}
+        {data.closes_at === null && !revealed && (
+          <div className="mt-4 rounded-[var(--r-md)] border-2 border-[var(--line)] bg-[var(--bg-sunken)] px-4 py-3">
+            <p className="text-[0.875rem] text-[var(--ink-2)]">
+              Esta predicción cierra cuando el grupo lo pide: {data.close_request_count} de{' '}
+              {data.close_required} pedidos.
+            </p>
+            {hasVoted ? (
+              <div className="mt-2.5">
+                {data.my_close_request ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={withdrawCloseRequest.isPending}
+                    onClick={() =>
+                      withdrawCloseRequest.mutate(data.id, {
+                        onError: (error) =>
+                          toast.show({ message: friendlyError(error), tone: 'error' }),
+                      })
+                    }
+                  >
+                    Retirar mi pedido de cierre
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={requestClose.isPending}
+                    onClick={() =>
+                      requestClose.mutate(data.id, {
+                        onSuccess: (result) => {
+                          if (result.closed) {
+                            toast.show({ message: 'La predicción cerró.', tone: 'success' })
+                          }
+                        },
+                        onError: (error) =>
+                          toast.show({
+                            message: friendlyError(error, 'No pudimos pedir el cierre.'),
+                            tone: 'error',
+                          }),
+                      })
+                    }
+                  >
+                    Pedir que se cierre
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <p className="mt-1.5 type-micro text-[var(--ink-3)]">
+                Tenés que votar antes de poder pedir el cierre.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Sumar opción */}
         {data.allow_new_options && availability.canVote && (

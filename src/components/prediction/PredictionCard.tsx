@@ -8,6 +8,7 @@ import {
   isRevealed,
   voteAvailability,
 } from '@/lib/prediction'
+import { Button } from '@/components/ui/Button'
 import { formatCountdown, formatRelative } from '@/lib/time'
 import { friendlyError } from '@/lib/errors'
 import type { Prediction } from '@/lib/types'
@@ -58,14 +59,25 @@ export function PredictionCard({
   )
   const selectedOptionId = prediction.myVote?.option_id ?? null
 
+  // Mismo patrón de estagiado que PredictionDetail: vive en el consumidor, se
+  // resetea en el render cuando cambia lo que lo vuelve obsoleto.
+  const [staged, setStaged] = useState<string | null>(null)
+  const voteKey = `${prediction.myVote?.option_id ?? ''}:${prediction.myVote?.cycle ?? ''}:${status}`
+  const [lastVoteKey, setLastVoteKey] = useState(voteKey)
+  if (lastVoteKey !== voteKey) {
+    setLastVoteKey(voteKey)
+    setStaged(null)
+  }
+
   useEffect(() => {
     return () => {
       if (savedTimer.current) window.clearTimeout(savedTimer.current)
     }
   }, [])
 
-  const onVote = (optionId: string): void => {
-    if (!availability.canVote || castVote.isPending) return
+  const onConfirm = (): void => {
+    if (!staged || castVote.isPending) return
+    const optionId = staged
 
     castVote.mutate(
       { predictionId: prediction.id, optionId, groupId },
@@ -104,9 +116,14 @@ export function PredictionCard({
       <div className="pointer-events-none absolute inset-x-3 -top-[15px] flex items-start justify-between gap-2 sm:inset-x-4">
         <PredictionStatusLabel status={status} cut tilt={-4} />
 
-        {!revealed && status !== 'expired' && (
+        {!revealed && status !== 'expired' && prediction.closes_at !== null && (
           <Sticker cut tilt={3}>
             <Countdown target={prediction.closes_at} prefix="cierra en" />
+          </Sticker>
+        )}
+        {!revealed && status !== 'expired' && prediction.closes_at === null && (
+          <Sticker tone="sky" cut tilt={3}>
+            sin fecha de cierre
           </Sticker>
         )}
       </div>
@@ -162,15 +179,34 @@ export function PredictionCard({
             key={option.id}
             option={option}
             selected={selectedOptionId === option.id}
+            staged={staged === option.id}
             disabled={!availability.canVote || castVote.isPending}
             showResults={showResults}
             totalVotes={totalVotes}
             isWinner={winnerId === option.id}
             pending={castVote.isPending}
-            onSelect={() => onVote(option.id)}
+            onSelect={() => setStaged(option.id)}
           />
         ))}
       </div>
+
+      {/* Confirmar: se monta sólo mientras hay algo estagiado, así la tarjeta
+          no crece para la mayoría, que no está votando en este momento. Nace
+          como consecuencia directa del tap propio, así que el foco queda en
+          el radio tocado y este botón es la siguiente parada del Tab; nunca
+          roba el foco. */}
+      {staged !== null && staged !== prediction.myVote?.option_id && (
+        <div className="mt-2.5">
+          <Button
+            variant="primary"
+            size="sm"
+            loading={castVote.isPending}
+            onClick={onConfirm}
+          >
+            {prediction.myVote ? 'Cambiar mi voto' : 'Confirmar'}
+          </Button>
+        </div>
+      )}
 
       {/* Pie contextual */}
       <div className="mt-3.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -178,12 +214,13 @@ export function PredictionCard({
           {status === 'proposed' ? (
             <ParticipationThreshold
               participantCount={prediction.participant_count}
-              minimumParticipants={prediction.minimum_participants}
+              requiredParticipants={prediction.required_participants}
+              memberCount={prediction.member_count}
               qualified={qualified}
             />
           ) : status === 'expired' ? (
             <p className="text-[0.8125rem] text-[var(--ink-3)]">
-              No juntó las {prediction.minimum_participants} personas a tiempo.
+              No juntó las {prediction.required_participants} personas a tiempo.
             </p>
           ) : status === 'closed' || status === 'resolving' ? (
             <p className="text-[0.8125rem] text-[var(--ink-2)]">

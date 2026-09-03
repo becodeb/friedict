@@ -478,7 +478,10 @@ export type Database = {
       predictions: {
         Row: {
           allow_new_options: boolean
-          closes_at: string
+          close_percent: number
+          close_request_count: number
+          closed_at: string | null
+          closes_at: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -490,6 +493,7 @@ export type Database = {
           option_type: Database["public"]["Enums"]["option_source"]
           participant_count: number
           qualification_deadline: string
+          qualification_percent: number
           resolved_at: string | null
           resolved_option_id: string | null
           results_visibility: Database["public"]["Enums"]["results_visibility"]
@@ -504,7 +508,10 @@ export type Database = {
         }
         Insert: {
           allow_new_options?: boolean
-          closes_at: string
+          close_percent?: number
+          close_request_count?: number
+          closed_at?: string | null
+          closes_at?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -516,6 +523,7 @@ export type Database = {
           option_type?: Database["public"]["Enums"]["option_source"]
           participant_count?: number
           qualification_deadline: string
+          qualification_percent?: number
           resolved_at?: string | null
           resolved_option_id?: string | null
           results_visibility?: Database["public"]["Enums"]["results_visibility"]
@@ -530,7 +538,10 @@ export type Database = {
         }
         Update: {
           allow_new_options?: boolean
-          closes_at?: string
+          close_percent?: number
+          close_request_count?: number
+          closed_at?: string | null
+          closes_at?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -542,6 +553,7 @@ export type Database = {
           option_type?: Database["public"]["Enums"]["option_source"]
           participant_count?: number
           qualification_deadline?: string
+          qualification_percent?: number
           resolved_at?: string | null
           resolved_option_id?: string | null
           results_visibility?: Database["public"]["Enums"]["results_visibility"]
@@ -793,13 +805,14 @@ export type Database = {
       create_prediction: {
         Args: {
           p_allow_new_options?: boolean
-          p_closes_at: string
+          p_close_percent?: number
+          p_closes_at?: string | null
           p_description?: string
           p_group_id: string
-          p_minimum_participants?: number
           p_option_type?: Database["public"]["Enums"]["option_source"]
           p_options: string[]
           p_qualification_hours?: number
+          p_qualification_percent?: number
           p_results_visibility?: Database["public"]["Enums"]["results_visibility"]
           p_title: string
           p_vote_interval?: string
@@ -855,6 +868,16 @@ export type Database = {
       remove_member: {
         Args: { p_group_id: string; p_user_id: string }
         Returns: undefined
+      }
+      request_close: { Args: { p_prediction_id: string }; Returns: Json }
+      withdraw_close_request: { Args: { p_prediction_id: string }; Returns: Json }
+      required_participants: {
+        Args: { p_member_count: number; p_percent: number }
+        Returns: number
+      }
+      required_close_requests: {
+        Args: { p_member_count: number; p_percent: number }
+        Returns: number
       }
       require_auth: { Args: never; Returns: string }
       revoke_invite: { Args: { p_invite_id: string }; Returns: undefined }

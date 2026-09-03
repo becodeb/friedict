@@ -98,6 +98,10 @@ describe('avisos en vivo', () => {
       p_title: '¿Llegamos a las 3 personas?',
       p_options: ['Sí', 'No'],
       p_closes_at: new Date(Date.now() + 48 * 3_600_000).toISOString(),
+      // 100%: con el grupo de 3 integrantes de este test, el requisito da
+      // exactamente 3 — mismo comportamiento que verificaba este test antes
+      // del quórum por porcentaje.
+      p_qualification_percent: 100,
     })
     predictionId = id!
 

@@ -42,7 +42,8 @@
         "p_allow_new_options": "boolean",
         "p_results_visibility": "public.results_visibility",
         "p_votes_visibility": "public.votes_visibility",
-        "p_minimum_participants": "smallint",
+        "p_qualification_percent": "smallint",
+        "p_close_percent": "smallint",
         "p_qualification_hours": "integer"
       }
     },
@@ -57,6 +58,8 @@
     "cancel_prediction": { "shape": "void", "params": { "p_prediction_id": "uuid" } },
 
     "cast_vote": { "shape": "scalar", "params": { "p_prediction_id": "uuid", "p_option_id": "uuid" } },
+    "request_close": { "shape": "scalar", "params": { "p_prediction_id": "uuid" } },
+    "withdraw_close_request": { "shape": "scalar", "params": { "p_prediction_id": "uuid" } },
     "propose_resolution": { "shape": "scalar", "params": { "p_prediction_id": "uuid", "p_option_id": "uuid" } },
     "confirm_resolution": { "shape": "scalar", "params": { "p_resolution_id": "uuid", "p_agrees": "boolean" } },
     "vote_timeline": { "shape": "table", "params": { "p_prediction_id": "uuid" } }

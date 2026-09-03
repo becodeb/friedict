@@ -24,12 +24,15 @@ export const DOMAIN_ERRORS: Record<string, string> = {
 
   voting_closed: 'Se cerraron las predicciones.',
   voting_not_open: 'Todavía no se puede votar.',
+  must_vote_first: 'Tenés que votar antes de pedir el cierre.',
   cycle_vote_used: 'Ya usaste tu voto de esta ronda. Esperá a la próxima.',
   invalid_option: 'Esa opción no es válida.',
   needs_two_options: 'Hacen falta al menos dos opciones.',
   too_many_options: 'Son demasiadas opciones. Máximo 12.',
   options_locked: 'Esta predicción no acepta opciones nuevas.',
   closes_at_must_be_future: 'El cierre tiene que ser en el futuro.',
+  interval_exceeds_window:
+    'No entra ni una ronda completa antes del cierre: alargá el cierre o acortá el intervalo.',
   prediction_not_found: 'No encontramos esta predicción.',
   template_not_found: 'Esa propuesta ya no está disponible.',
   already_resolved: 'Esta predicción ya está resuelta.',

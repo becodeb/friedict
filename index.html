@@ -15,8 +15,10 @@
       content="Predicciones privadas entre amigos. Elegí qué va a pasar y descubrí quién tenía razón."
     />
 
-    <!-- Los grupos son privados: nada de esto debe terminar en un buscador. -->
-    <meta name="robots" content="noindex, nofollow, noarchive, noimageindex" />
+    <!-- El meta "robots" ya NO es una constante acá: `<SeoRobots>` lo escribe
+         por ruta apenas monta React (ver src/components/SeoRobots.tsx). El
+         control real es el header `X-Robots-Tag` del servidor, que no
+         depende de JS — esto es sólo un mirror para mejorar lo indexable. -->
     <meta name="referrer" content="same-origin" />
 
     <meta name="theme-color" content="#f1f0fa" media="(prefers-color-scheme: light)" />

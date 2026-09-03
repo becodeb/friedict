@@ -204,20 +204,42 @@ describe('ciclo de vida completo', () => {
       expect(rows[0]!.n).toBe(0)
     })
 
-    it('el cliente tampoco puede bajarse el umbral a 1', async () => {
-      const { data } = await ana.client.rpc('create_prediction', {
+    it('el cliente no puede saltarse el quórum: el porcentaje va acotado entre 1 y 100', async () => {
+      // `qualification_percent` es un `smallint check (between 1 and 100)`: un
+      // valor fuera de rango lo rechaza la base, no un clamp silencioso.
+      const { error } = await ana.client.rpc('create_prediction', {
         p_group_id: groupId,
         p_title: '¿Me auto-califico con mi propio voto?',
         p_options: ['Sí', 'No'],
         p_closes_at: inFuture(48),
-        p_minimum_participants: 1,
+        p_qualification_percent: 0,
+      })
+      expect(error).not.toBeNull()
+    })
+
+    it('el requisito real nunca supera la cantidad viva de integrantes del grupo', async () => {
+      const { data } = await ana.client.rpc('create_prediction', {
+        p_group_id: groupId,
+        p_title: '¿El quórum se acota al grupo?',
+        p_options: ['Sí', 'No'],
+        p_closes_at: inFuture(48),
+        p_qualification_percent: 100,
       })
 
+      const memberCount = (await sql(
+        'select count(*)::int as n from public.group_members where group_id = $1',
+        [groupId],
+      )) as Array<{ n: number }>
+
       const rows = (await sql(
-        'select minimum_participants from public.predictions where id = $1',
+        `select public.required_participants(
+           (select count(*)::int from public.group_members where group_id = predictions.group_id),
+           qualification_percent
+         ) as required
+         from public.predictions where id = $1`,
         [data as unknown as string],
-      )) as Array<{ minimum_participants: number }>
-      expect(rows[0]!.minimum_participants).toBe(3)
+      )) as Array<{ required: number }>
+      expect(rows[0]!.required).toBe(memberCount[0]!.n)
     })
 
     it('sigue en prueba con 1 y con 2 participantes', async () => {

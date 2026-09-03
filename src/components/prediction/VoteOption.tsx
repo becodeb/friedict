@@ -19,6 +19,7 @@ import type { OptionWithTally } from '@/lib/types'
 export function VoteOption({
   option,
   selected,
+  staged,
   disabled,
   showResults,
   totalVotes,
@@ -27,31 +28,42 @@ export function VoteOption({
   onSelect,
 }: {
   option: OptionWithTally
+  /** El voto YA COMPROMETIDO (comitteado en el servidor). Significado sin cambios. */
   selected: boolean
+  /** La intención pendiente, todavía sin confirmar. */
+  staged: boolean
   disabled: boolean
   showResults: boolean
   totalVotes: number
   isWinner?: boolean
   pending?: boolean
+  /** Ahora sólo estagia: quien usa el componente decide cuándo confirmar. */
   onSelect: () => void
 }) {
   const count = option.tally?.voteCount ?? 0
   const share = showResults && totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
   const filled = selected || Boolean(isWinner)
+  const committed = selected && !staged
 
   return (
     <button
       type="button"
       role="radio"
-      aria-checked={selected}
+      aria-checked={staged ? true : selected}
       disabled={disabled}
       onClick={onSelect}
       data-checked={selected}
+      data-staged={staged}
+      data-committed={committed}
       className={cn(
         't-check opt-pill group',
         'transition-[background-color,transform,box-shadow] duration-[var(--motion-fast)]',
         'ease-[var(--ease-standard)] motion-reduce:transition-none',
         selected && 'bg-[var(--accent)] shadow-[var(--shadow-1)]',
+        // Estagiada pero todavía no comprometida: mismo look en outline, sin
+        // rellenar de chicle todavía — el relleno es "ya guardado", el
+        // outline es "elegiste esto, falta confirmar".
+        staged && !selected && 'ring-2 ring-[var(--accent)] ring-offset-1',
         isWinner && 'bg-[var(--status-resolved-wash)] shadow-[var(--shadow-1)]',
         !disabled && !filled && 'hover:bg-[var(--surface-2)]',
         !disabled &&
@@ -110,6 +122,7 @@ export function VoteOption({
         {isWinner && (
           <span className="ml-2 type-meta text-[var(--on-candy)] opacity-80">pasó</span>
         )}
+        {committed && <span className="sr-only"> — tu voto guardado</span>}
       </span>
 
       {showResults && (

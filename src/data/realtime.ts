@@ -35,7 +35,7 @@ interface ChangeEvent {
   title?: string
   status?: PredictionRow['status']
   previous_status?: PredictionRow['status'] | null
-  minimum_participants?: number
+  required_participants?: number
   participant_count?: number
   created_by?: string
 }
@@ -127,32 +127,41 @@ class RealtimeConnection {
 
 const connection = new RealtimeConnection()
 
+/** Forma mínima de predicción que trae un aviso en vivo: sólo lo que hace falta para un toast. */
+export interface RealtimePredictionHint {
+  id: string
+  title: string
+  status: PredictionRow['status']
+  required_participants: number
+  participant_count: number
+  created_by: string
+}
+
 export interface GroupRealtimeHandlers {
-  /** Una predicción "En prueba" alcanzó la participación mínima. */
-  onQualified?: (prediction: PredictionRow) => void
+  /** Una predicción "En prueba" alcanzó la participación requerida. */
+  onQualified?: (prediction: RealtimePredictionHint) => void
   /** Se confirmó un resultado. */
-  onResolved?: (prediction: PredictionRow) => void
+  onResolved?: (prediction: RealtimePredictionHint) => void
   /** Entró alguien al grupo. */
   onMemberJoined?: () => void
   /** Apareció una predicción nueva que no creaste vos. */
-  onNewPrediction?: (prediction: PredictionRow) => void
+  onNewPrediction?: (prediction: RealtimePredictionHint) => void
 }
 
 /**
- * El aviso trae sólo unos pocos campos, pero los handlers reciben algo con
- * forma de `PredictionRow` porque es lo que usan para armar el texto del
- * toast (título y mínimo de participantes). No es la fila completa y no se
- * usa para pintar: para eso se invalida y se vuelve a pedir.
+ * El aviso trae sólo unos pocos campos: título y requisito de participación
+ * para el texto del toast. No es la fila completa y no se usa para pintar:
+ * para eso se invalida y se vuelve a pedir.
  */
-function asPredictionRow(event: ChangeEvent): PredictionRow {
+function asPredictionRow(event: ChangeEvent): RealtimePredictionHint {
   return {
     id: event.prediction_id,
     title: event.title,
     status: event.status,
-    minimum_participants: event.minimum_participants,
+    required_participants: event.required_participants,
     participant_count: event.participant_count,
     created_by: event.created_by,
-  } as unknown as PredictionRow
+  } as unknown as RealtimePredictionHint
 }
 
 export function useGroupRealtime(

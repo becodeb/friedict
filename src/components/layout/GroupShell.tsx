@@ -61,7 +61,7 @@ export function GroupShell() {
     onQualified: (prediction) => {
       setHasNews(true)
       toast.show({
-        message: `«${prediction.title}» juntó las ${prediction.minimum_participants} personas. Queda.`,
+        message: `«${prediction.title}» juntó las ${prediction.required_participants} personas. Queda.`,
         tone: 'success',
       })
     },

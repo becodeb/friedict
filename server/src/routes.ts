@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { queryAs } from './db.js'
 import { requireAuth } from './auth.js'
+import { PREDICTION_SELECT } from './prediction-select.js'
 
 /**
  * Lecturas.
@@ -23,56 +24,8 @@ import { requireAuth } from './auth.js'
 
 export const apiRouter = Router()
 
-/**
- * Una predicción con todo lo que la tarjeta del feed necesita.
- *
- * Detalle que importa: `tally` y `votes` NO se filtran acá. La RLS de
- * `prediction_option_tallies` implementa `results_visibility` y la de
- * `prediction_votes` implementa `votes_visibility`, así que la subconsulta
- * devuelve null o lista vacía sola cuando no corresponde verlos. Es el mismo
- * comportamiento que tenían los embeds de PostgREST.
- */
-const PREDICTION_SELECT = `
-  select
-    p.*,
-    coalesce((
-      select jsonb_agg(
-        jsonb_build_object(
-          'id', o.id,
-          'prediction_id', o.prediction_id,
-          'label', o.label,
-          'position', o.position,
-          'member_id', o.member_id,
-          'created_by', o.created_by,
-          'created_at', o.created_at,
-          'tally', case
-            when t.option_id is null then null
-            else jsonb_build_object('vote_count', t.vote_count, 'voter_count', t.voter_count)
-          end
-        )
-        order by o.position
-      )
-      from public.prediction_options o
-      left join public.prediction_option_tallies t on t.option_id = o.id
-      where o.prediction_id = p.id
-    ), '[]'::jsonb) as options,
-    coalesce((
-      select jsonb_agg(to_jsonb(v) order by v.cycle, v.created_at)
-      from public.prediction_votes v
-      where v.prediction_id = p.id
-    ), '[]'::jsonb) as votes,
-    (
-      select jsonb_build_object(
-        'id', pr.id,
-        'display_name', pr.display_name,
-        'avatar_seed', pr.avatar_seed,
-        'accent', pr.accent
-      )
-      from public.profiles pr
-      where pr.id = p.created_by
-    ) as author
-  from public.predictions p
-`
+// PREDICTION_SELECT (campos derivados de member_count, options, votes, author)
+// vive en ./prediction-select.ts — ver el docblock ahí.
 
 // ---------------------------------------------------------------------------
 // Grupos

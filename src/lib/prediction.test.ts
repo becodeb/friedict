@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canSeeVotes,
   currentCycle,
   effectiveStatus,
+  feedRank,
   hasQualified,
   isOpenForVoting,
   nextCycleAt,
   participantsMissing,
+  requiredCloseRequestsPreview,
+  requiredParticipantsPreview,
   sortFeed,
   voteAvailability,
   voteForCurrentCycle,
@@ -31,6 +35,10 @@ function makePrediction(overrides: Partial<PredictionRow> = {}): PredictionRow {
     results_visibility: 'on_close',
     votes_visibility: 'on_close',
     minimum_participants: 3,
+    qualification_percent: 60,
+    close_percent: 50,
+    close_request_count: 0,
+    closed_at: null,
     qualification_deadline: hours(6),
     opens_at: hours(-4),
     closes_at: days(2),
@@ -44,6 +52,11 @@ function makePrediction(overrides: Partial<PredictionRow> = {}): PredictionRow {
     updated_at: hours(-4),
     ...overrides,
   }
+}
+
+/** `StatusInput` requiere `required_participants`: se agrega acá, no en el fixture crudo. */
+function withStatusInput(row: PredictionRow, requiredParticipants = 3) {
+  return { ...row, required_participants: requiredParticipants }
 }
 
 function makeVote(overrides: Partial<Vote> = {}): Vote {
@@ -84,65 +97,105 @@ describe('umbral de participación', () => {
     expect(participantsMissing(2, 3)).toBe(1)
     expect(participantsMissing(5, 3)).toBe(0)
   })
+
+  // Grupos chicos: el bug era que `minimum_participants` fijo en 3 nunca
+  // calificaba en un grupo de 1 o 2 personas. `hasQualified` en sí es sólo una
+  // comparación — la corrección real vive en required_participants() del lado
+  // del servidor (`least(member_count, …)`) — pero el mirror del cliente tiene
+  // que aceptar cualquier requisito ya acotado, no sólo 3.
+  it.each([
+    [1, 1, true],
+    [2, 2, true],
+    [3, 3, true],
+    [7, 5, true],
+    [4, 5, false],
+  ])(
+    'con %i participantes y requisito %i, califica = %s (requisito ya acotado al grupo)',
+    (count, required, expected) => {
+      expect(hasQualified(count, required, false)).toBe(expected)
+    },
+  )
 })
 
 describe('effectiveStatus', () => {
   it.each([0, 1, 2])(
     'expira con %i participantes cuando vence el plazo de calificación',
     (count) => {
-      const prediction = makePrediction({
-        participant_count: count,
-        qualification_deadline: hours(-1),
-      })
+      const prediction = withStatusInput(
+        makePrediction({ participant_count: count, qualification_deadline: hours(-1) }),
+      )
       expect(effectiveStatus(prediction, NOW)).toBe('expired')
     },
   )
 
   it('se mantiene con 3 participantes aunque venza el plazo', () => {
-    const prediction = makePrediction({
-      participant_count: 3,
-      qualification_deadline: hours(-1),
-    })
+    const prediction = withStatusInput(
+      makePrediction({ participant_count: 3, qualification_deadline: hours(-1) }),
+    )
     expect(effectiveStatus(prediction, NOW)).toBe('active')
   })
 
   it('una predicción del sistema no expira nunca por falta de participación', () => {
-    const prediction = makePrediction({
-      is_default: true,
-      participant_count: 0,
-      qualification_deadline: hours(-10),
-    })
+    const prediction = withStatusInput(
+      makePrediction({ is_default: true, participant_count: 0, qualification_deadline: hours(-10) }),
+    )
     expect(effectiveStatus(prediction, NOW)).toBe('active')
   })
 
   it('sigue en prueba mientras no venza el plazo', () => {
-    const prediction = makePrediction({ participant_count: 2 })
+    const prediction = withStatusInput(makePrediction({ participant_count: 2 }))
     expect(effectiveStatus(prediction, NOW)).toBe('proposed')
   })
 
   it('cierra al llegar closes_at', () => {
-    const prediction = makePrediction({
-      status: 'active',
-      participant_count: 4,
-      closes_at: hours(-1),
-    })
+    const prediction = withStatusInput(
+      makePrediction({ status: 'active', participant_count: 4, closes_at: hours(-1) }),
+    )
     expect(effectiveStatus(prediction, NOW)).toBe('closed')
   })
 
   it('no recalcula estados terminales', () => {
     for (const status of ['resolved', 'expired', 'cancelled', 'resolving'] as const) {
-      const prediction = makePrediction({ status, closes_at: hours(-100) })
+      const prediction = withStatusInput(makePrediction({ status, closes_at: hours(-100) }))
       expect(effectiveStatus(prediction, NOW)).toBe(status)
     }
   })
 
   it('una que calificó pero cuyo cierre ya pasó queda cerrada, no activa', () => {
-    const prediction = makePrediction({
-      participant_count: 4,
-      qualification_deadline: hours(-20),
-      closes_at: hours(-2),
-    })
+    const prediction = withStatusInput(
+      makePrediction({
+        participant_count: 4,
+        qualification_deadline: hours(-20),
+        closes_at: hours(-2),
+      }),
+    )
     expect(effectiveStatus(prediction, NOW)).toBe('closed')
+  })
+
+  // -------------------------------------------------------------------------
+  // closes_at nulo: predicciones abiertas
+  // -------------------------------------------------------------------------
+  it('no lanza con closes_at nulo, activa', () => {
+    const prediction = withStatusInput(
+      makePrediction({ status: 'active', participant_count: 4, closes_at: null }),
+    )
+    expect(() => effectiveStatus(prediction, NOW)).not.toThrow()
+    expect(effectiveStatus(prediction, NOW)).toBe('active')
+  })
+
+  it('nunca cierra sola por fecha con closes_at nulo, en NINGÚN now', () => {
+    const prediction = withStatusInput(
+      makePrediction({ status: 'active', participant_count: 4, closes_at: null }),
+    )
+    const lejano = new Date(NOW.getTime() + 100 * 365 * 86_400_000)
+    expect(effectiveStatus(prediction, lejano)).toBe('active')
+  })
+
+  it('con closes_at nulo, "en prueba" sigue en prueba (no expira por fecha de cierre)', () => {
+    const prediction = withStatusInput(
+      makePrediction({ status: 'proposed', participant_count: 1, closes_at: null }),
+    )
+    expect(effectiveStatus(prediction, NOW)).toBe('proposed')
   })
 })
 
@@ -151,23 +204,21 @@ describe('effectiveStatus', () => {
 // ---------------------------------------------------------------------------
 describe('votación clásica', () => {
   it('se puede votar mientras esté abierta', () => {
-    const prediction = makePrediction({ participant_count: 3, status: 'active' })
+    const prediction = withStatusInput(makePrediction({ participant_count: 3, status: 'active' }))
     expect(voteAvailability(prediction, [], NOW).canVote).toBe(true)
   })
 
   it('se puede CAMBIAR el voto hasta el cierre', () => {
-    const prediction = makePrediction({ participant_count: 3, status: 'active' })
+    const prediction = withStatusInput(makePrediction({ participant_count: 3, status: 'active' }))
     const availability = voteAvailability(prediction, [makeVote()], NOW)
     expect(availability.canVote).toBe(true)
     expect(availability.reason).toBeNull()
   })
 
   it('no se puede votar después del cierre', () => {
-    const prediction = makePrediction({
-      status: 'active',
-      participant_count: 4,
-      closes_at: hours(-1),
-    })
+    const prediction = withStatusInput(
+      makePrediction({ status: 'active', participant_count: 4, closes_at: hours(-1) }),
+    )
     const availability = voteAvailability(prediction, [], NOW)
     expect(availability.canVote).toBe(false)
     expect(availability.reason).toBe('closed')
@@ -175,19 +226,27 @@ describe('votación clásica', () => {
   })
 
   it('no se puede votar en una que expiró', () => {
-    const prediction = makePrediction({ status: 'expired' })
+    const prediction = withStatusInput(makePrediction({ status: 'expired' }))
     expect(voteAvailability(prediction, [], NOW).canVote).toBe(false)
   })
 
   it('no se puede votar antes de que abra', () => {
-    const prediction = makePrediction({ opens_at: hours(3), status: 'active' })
+    const prediction = withStatusInput(makePrediction({ opens_at: hours(3), status: 'active' }))
     const availability = voteAvailability(prediction, [], NOW)
     expect(availability.canVote).toBe(false)
     expect(availability.reason).toBe('not_open_yet')
   })
 
   it('se puede votar en una que está EN PRUEBA: así es como califica', () => {
-    const prediction = makePrediction({ status: 'proposed', participant_count: 2 })
+    const prediction = withStatusInput(makePrediction({ status: 'proposed', participant_count: 2 }))
+    expect(voteAvailability(prediction, [], NOW).canVote).toBe(true)
+  })
+
+  it('con closes_at nulo, la votación queda abierta siempre', () => {
+    const prediction = withStatusInput(
+      makePrediction({ status: 'active', participant_count: 4, closes_at: null }),
+    )
+    expect(isOpenForVoting(prediction, NOW)).toBe(true)
     expect(voteAvailability(prediction, [], NOW).canVote).toBe(true)
   })
 })
@@ -197,16 +256,18 @@ describe('votación clásica', () => {
 // ---------------------------------------------------------------------------
 describe('votación evolutiva', () => {
   const recurring = (overrides: Partial<PredictionRow> = {}) =>
-    makePrediction({
-      voting_mode: 'recurring',
-      vote_interval: '7 days',
-      opens_at: days(-21),
-      closes_at: days(30),
-      qualification_deadline: days(-14),
-      participant_count: 4,
-      status: 'active',
-      ...overrides,
-    })
+    withStatusInput(
+      makePrediction({
+        voting_mode: 'recurring',
+        vote_interval: '7 days',
+        opens_at: days(-21),
+        closes_at: days(30),
+        qualification_deadline: days(-14),
+        participant_count: 4,
+        status: 'active',
+        ...overrides,
+      }),
+    )
 
   it('calcula el ciclo vigente a partir de opens_at y el intervalo', () => {
     expect(currentCycle(days(-21), '7 days', NOW)).toBe(3)
@@ -257,9 +318,14 @@ describe('votación evolutiva', () => {
   })
 
   it('en modo clásico el «voto del ciclo» es simplemente el único voto', () => {
-    const prediction = makePrediction({ status: 'active', participant_count: 3 })
+    const prediction = withStatusInput(makePrediction({ status: 'active', participant_count: 3 }))
     const vote = makeVote()
     expect(voteForCurrentCycle(prediction, [vote], NOW)?.id).toBe(vote.id)
+  })
+
+  it('evolutiva sin cierre: el ciclo se sigue calculando bien con closes_at nulo', () => {
+    const prediction = recurring({ closes_at: null })
+    expect(voteAvailability(prediction, [], NOW).canVote).toBe(true)
   })
 })
 
@@ -267,8 +333,16 @@ describe('votación evolutiva', () => {
 // Orden del feed
 // ---------------------------------------------------------------------------
 describe('orden del feed', () => {
-  const withExtras = (row: PredictionRow, myVotes: Vote[] = []): Prediction => ({
+  const withExtras = (
+    row: PredictionRow,
+    myVotes: Vote[] = [],
+    requiredParticipants = 3,
+  ): Prediction => ({
     ...row,
+    required_participants: requiredParticipants,
+    member_count: 5,
+    close_required: 3,
+    my_close_request: false,
     options: [],
     votes: myVotes,
     myVotes,
@@ -292,5 +366,97 @@ describe('orden del feed', () => {
     expect(orden[0]).toBe('en-prueba')
     expect(orden[1]).toBe('sin-votar')
     expect(orden[2]).toBe('votada')
+  })
+
+  it('feedRank no lanza y no marca "cierra en 24h" a una predicción abierta ya votada', () => {
+    // Con myVote presente se sale de las ramas "necesita tu voto" (0/1) y se
+    // llega a la que compara `closesIn` — la que de verdad ejercita el fix.
+    const abierta = withExtras(
+      makePrediction({
+        id: 'abierta',
+        status: 'active',
+        participant_count: 4,
+        closes_at: null,
+      }),
+      [makeVote()],
+    )
+    expect(() => feedRank(abierta, NOW)).not.toThrow()
+    // rank 5 = "activa, no está por vencer" — nunca 4 ("cierra en <24h"),
+    // porque no hay ninguna fecha de la que esté "por vencer".
+    expect(feedRank(abierta, NOW)).toBe(5)
+  })
+
+  it('sortFeed no lanza con closes_at nulo y ordena lo abierto al final de su rango', () => {
+    const cierraProto = withExtras(
+      makePrediction({
+        id: 'cierra-pronto',
+        status: 'active',
+        participant_count: 4,
+        closes_at: hours(2),
+      }),
+    )
+    const abierta = withExtras(
+      makePrediction({
+        id: 'abierta',
+        status: 'active',
+        participant_count: 4,
+        closes_at: null,
+      }),
+    )
+    expect(() => sortFeed([abierta, cierraProto], NOW)).not.toThrow()
+
+    // Las dos son rank 4 (cierran "pronto"/nunca)… en realidad la abierta cae
+    // en rank 5 y la que cierra en 2h en rank 4, así que la que tiene fecha
+    // aparece primero de todos modos. Se agrega una tercera del mismo rango
+    // para probar el desempate real dentro de rank 5.
+    const otraAbierta = withExtras(
+      makePrediction({
+        id: 'otra-abierta',
+        status: 'active',
+        participant_count: 4,
+        closes_at: days(10),
+      }),
+    )
+    const orden = sortFeed([abierta, otraAbierta], NOW).map((p) => p.id)
+    expect(orden[0]).toBe('otra-abierta')
+    expect(orden[1]).toBe('abierta')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// canSeeVotes
+// ---------------------------------------------------------------------------
+describe('requiredParticipantsPreview / requiredCloseRequestsPreview (mirror del formulario de creación)', () => {
+  it('un grupo de 2 personas al 60% pide 2 (el piso de calificación es 1, el techo es el grupo)', () => {
+    expect(requiredParticipantsPreview(2, 60)).toBe(2)
+  })
+
+  it('nunca supera el conteo vivo de integrantes', () => {
+    expect(requiredParticipantsPreview(3, 100)).toBe(3)
+  })
+
+  it('el piso de calificación es 1', () => {
+    expect(requiredParticipantsPreview(10, 1)).toBe(1)
+  })
+
+  it('el piso de cierre es 2, no 1', () => {
+    expect(requiredCloseRequestsPreview(1, 50)).toBe(2)
+  })
+
+  it('el cierre también se acota al conteo vivo', () => {
+    expect(requiredCloseRequestsPreview(2, 100)).toBe(2)
+  })
+})
+
+describe('canSeeVotes', () => {
+  it.each([
+    ['visible' as const, 'active' as const, true],
+    ['anonymous' as const, 'resolved' as const, false],
+    ['on_close' as const, 'proposed' as const, false],
+    ['on_close' as const, 'closed' as const, true],
+    ['visible' as const, 'proposed' as const, true],
+    ['anonymous' as const, 'closed' as const, false],
+  ])('votes_visibility=%s, status=%s → %s', (votesVisibility, status, expected) => {
+    expect(canSeeVotes({ votes_visibility: votesVisibility }, status)).toBe(expected)
   })
 })

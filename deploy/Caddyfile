@@ -40,11 +40,21 @@ cantado.tudominio.com {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy same-origin
-		# Los grupos son privados: que ningún buscador los indexe.
-		X-Robots-Tag "noindex, nofollow"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		-Server
 	}
+
+	# Indexación selectiva por ruta — espejo de server/src/robots.ts y
+	# src/lib/indexing.ts. Default-deny: TODA ruta manda `noindex, nofollow`
+	# salvo `/` y `/entrar`, para las que el header se saca. Es además la
+	# llave de apagado más rápida: comentar las dos líneas de @indexable de
+	# abajo vuelve todo `noindex` sin esperar ningún rebuild de la app.
+	header X-Robots-Tag "noindex, nofollow"
+
+	@indexable {
+		path / /entrar /entrar/
+	}
+	header @indexable -X-Robots-Tag
 
 	log {
 		output file /var/log/caddy/cantado.log

@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 export interface SegmentedOption<T extends string> {
@@ -21,19 +21,23 @@ export function Segmented<T extends string>({
   value,
   onChange,
   columns = 2,
+  help,
 }: {
   legend: string
   options: SegmentedOption<T>[]
   value: T
   onChange: (next: T) => void
   columns?: 1 | 2 | 3
+  /** `<HelpTip>` u otro disparador de ayuda, mostrado junto al legend. */
+  help?: ReactNode
 }) {
   const name = useId()
 
   return (
     <fieldset className="min-w-0 border-0 p-0">
-      <legend className="mb-1.5 text-[0.8125rem] font-semibold text-[var(--ink-2)]">
+      <legend className="mb-1.5 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-[var(--ink-2)]">
         {legend}
+        {help}
       </legend>
       <div
         className={cn(

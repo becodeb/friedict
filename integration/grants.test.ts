@@ -32,6 +32,8 @@ const RPC_PUBLICA = new Set([
   'confirm_resolution',
   'vote_timeline',
   'finalize_predictions',
+  'request_close',
+  'withdraw_close_request',
   // Helpers de autorización y cálculo, sin efectos ni datos ajenos
   'is_group_member',
   'group_role',
@@ -42,6 +44,8 @@ const RPC_PUBLICA = new Set([
   'can_see_votes',
   'calculate_points',
   'current_cycle',
+  'required_participants',
+  'required_close_requests',
   // Identidad: la lee cada política RLS, así que tiene que ser ejecutable.
   'current_user_id',
   // Autenticación. Viven acá y no en el servidor para que el rol de la app no
@@ -121,6 +125,7 @@ describe('superficie de la API', () => {
       'touch_updated_at',
       'on_vote_changed',
       'on_option_created',
+      'group_member_count',
     ]
 
     for (const nombre of internas) {

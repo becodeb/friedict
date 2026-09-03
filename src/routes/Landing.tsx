@@ -11,6 +11,44 @@ import { Sticker } from '@/components/ui/Sticker'
 import { ParticipationThreshold } from '@/components/prediction/ParticipationThreshold'
 import { PredictionStatusLabel } from '@/components/prediction/PredictionStatus'
 import { cn } from '@/lib/cn'
+import { requiredParticipantsPreview } from '@/lib/prediction'
+
+/**
+ * Canonical + Open Graph: la RAÍZ pelada del sitio, nunca con query ni path.
+ * `/` es la única ruta con un canonical propio a propósito — es la única
+ * pensada para que la comparta un buscador o una preview de link.
+ */
+function useLandingSeoTags(): void {
+  useEffect(() => {
+    const origin = window.location.origin
+
+    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
+    if (!canonical) {
+      canonical = document.createElement('link')
+      canonical.rel = 'canonical'
+      document.head.appendChild(canonical)
+    }
+    canonical.href = origin
+
+    const setOg = (property: string, content: string): void => {
+      let tag = document.querySelector<HTMLMetaElement>(`meta[property="${property}"]`)
+      if (!tag) {
+        tag = document.createElement('meta')
+        tag.setAttribute('property', property)
+        document.head.appendChild(tag)
+      }
+      tag.content = content
+    }
+
+    setOg('og:url', origin)
+    setOg('og:type', 'website')
+    setOg('og:title', 'friedict')
+    setOg(
+      'og:description',
+      'Predicciones privadas entre amigos. Elegí qué creés que va a pasar y después se ve quién tenía razón.',
+    )
+  }, [])
+}
 
 /**
  * Portada.
@@ -23,16 +61,28 @@ import { cn } from '@/lib/cn'
  */
 const EXAMPLE_OPTIONS = ['Sí', 'No', 'Dice que está llegando pero sigue en su casa']
 
+// Ejemplo de portada: un grupo de 5, con el default de calificación (60%).
+const EXAMPLE_MEMBER_COUNT = 5
+const EXAMPLE_QUALIFICATION_PERCENT = 60
+const EXAMPLE_PARTICIPANT_COUNT = 2
+
 export function Landing() {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const { data: groups } = useMyGroups(Boolean(user))
+
+  useLandingSeoTags()
 
   // Quien ya tiene sesión y grupo no necesita ver la portada.
   useEffect(() => {
     if (loading || !user || !groups) return
     if (groups.length > 0 && groups[0]) navigate(`/g/${groups[0].id}`, { replace: true })
   }, [loading, user, groups, navigate])
+
+  const exampleRequired = requiredParticipantsPreview(
+    EXAMPLE_MEMBER_COUNT,
+    EXAMPLE_QUALIFICATION_PERCENT,
+  )
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
@@ -146,8 +196,9 @@ export function Landing() {
 
             <div className="mt-3.5">
               <ParticipationThreshold
-                participantCount={2}
-                minimumParticipants={3}
+                participantCount={EXAMPLE_PARTICIPANT_COUNT}
+                requiredParticipants={exampleRequired}
+                memberCount={EXAMPLE_MEMBER_COUNT}
                 qualified={false}
               />
             </div>
@@ -161,9 +212,10 @@ export function Landing() {
             </Sticker>
             <h2 className="type-title text-[1.25rem]">Las predicciones se ganan el lugar</h2>
             <p className="mt-2.5 leading-relaxed text-[var(--ink-2)]">
-              Cuando alguien propone una, entra <em>en prueba</em>. Si en 48 horas no
-              eligieron al menos tres personas, se va sola y no ensucia el feed. Si
-              llegan a tres, queda hasta su fecha de cierre.
+              Cuando alguien propone una, entra <em>en prueba</em>. Necesita que la
+              elija un porcentaje del grupo — no un número fijo, así que un grupo de
+              2 puede calificar igual que uno de 20. Si no llega a tiempo, se va sola
+              y no ensucia el feed.
             </p>
           </div>
           <div className="card-pop relative px-5 pb-5 pt-7">

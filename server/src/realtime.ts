@@ -30,7 +30,7 @@ interface ChangePayload {
   title?: string
   status?: string
   previous_status?: string | null
-  minimum_participants?: number
+  required_participants?: number
   participant_count?: number
   created_by?: string
 }

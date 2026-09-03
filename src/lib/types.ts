@@ -49,6 +49,18 @@ export interface Prediction extends PredictionRow {
   /** Todos mis votos, para predicciones evolutivas. */
   myVotes: Vote[]
   author: Pick<Profile, 'id' | 'display_name' | 'avatar_seed' | 'accent'> | null
+  /**
+   * Derivados, calculados del lado del servidor: el cliente no conoce el
+   * tamaño real del grupo, así que nunca los computa — sólo los muestra.
+   */
+  /** Integrantes vivos del grupo en este momento. */
+  member_count: number
+  /** Cuántos hacen falta para calificar, ya acotado a member_count. */
+  required_participants: number
+  /** Cuántos pedidos de cierre hacen falta para cerrar sin fecha. */
+  close_required: number
+  /** ¿Quien consulta ya pidió el cierre de esta predicción? */
+  my_close_request: boolean
 }
 
 export interface InvitePreview {

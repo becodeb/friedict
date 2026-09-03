@@ -15,6 +15,12 @@ import type {
   Vote,
 } from '@/lib/types'
 
+export interface CloseRequestResult {
+  requests: number
+  required: number
+  closed: boolean
+}
+
 /**
  * La forma en que el servidor devuelve una predicción: la fila más las
  * opciones (con su recuento), los votos visibles y el autor, todo armado con
@@ -32,6 +38,10 @@ interface RawPrediction extends PredictionRow {
   >
   votes: Vote[]
   author: Prediction['author']
+  member_count: number
+  required_participants: number
+  close_required: number
+  my_close_request: boolean
 }
 
 /**
@@ -224,7 +234,10 @@ export interface CreatePredictionVars {
   allowNewOptions: boolean
   resultsVisibility: 'always' | 'after_vote' | 'on_close'
   votesVisibility: 'visible' | 'on_close' | 'anonymous'
-  closesAt: string
+  /** `undefined` = sin fecha de cierre: cierra cuando el grupo lo pide. */
+  closesAt?: string | undefined
+  qualificationPercent: number
+  closePercent: number
   qualificationHours: number
 }
 
@@ -239,14 +252,15 @@ export function useCreatePrediction() {
         p_group_id: vars.groupId,
         p_title: vars.title,
         p_options: vars.optionType === 'members' ? [] : vars.options,
-        p_closes_at: vars.closesAt,
         p_option_type: vars.optionType,
         p_voting_mode: vars.votingMode,
         p_allow_new_options: vars.allowNewOptions,
         p_results_visibility: vars.resultsVisibility,
         p_votes_visibility: vars.votesVisibility,
-        p_minimum_participants: 3,
+        p_qualification_percent: vars.qualificationPercent,
+        p_close_percent: vars.closePercent,
         p_qualification_hours: vars.qualificationHours,
+        ...(vars.closesAt ? { p_closes_at: vars.closesAt } : {}),
         ...(vars.description ? { p_description: vars.description } : {}),
         ...(vars.votingMode === 'recurring'
           ? { p_vote_interval: `${vars.intervalDays ?? 7} days` }
@@ -255,6 +269,34 @@ export function useCreatePrediction() {
     onSuccess: (_id, vars) => {
       void queryClient.invalidateQueries({ queryKey: qk.predictions(vars.groupId) })
       void queryClient.invalidateQueries({ queryKey: qk.activity(vars.groupId) })
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Cierre colaborativo
+// ---------------------------------------------------------------------------
+
+export function useRequestClose(groupId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (predictionId: string) =>
+      rpc<CloseRequestResult>('request_close', { p_prediction_id: predictionId }),
+    onSuccess: (_data, predictionId) => {
+      void queryClient.invalidateQueries({ queryKey: qk.prediction(predictionId) })
+      void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
+    },
+  })
+}
+
+export function useWithdrawCloseRequest(groupId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (predictionId: string) =>
+      rpc<CloseRequestResult>('withdraw_close_request', { p_prediction_id: predictionId }),
+    onSuccess: (_data, predictionId) => {
+      void queryClient.invalidateQueries({ queryKey: qk.prediction(predictionId) })
+      void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
     },
   })
 }

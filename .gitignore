@@ -41,3 +41,9 @@ server/node_modules
 server/dist
 server/public
 server/.env
+
+# Cache local de agentes SDD (registro de skills, no versionado)
+.atl/
+
+# Config local de Engram (estado de agente, no versionado)
+.engram/

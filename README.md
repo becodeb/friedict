@@ -15,11 +15,16 @@ la app.
 
 ## Qué hace
 
-- **Grupos privados.** Se entra sólo con un link de invitación. Nada es visible
-  desde afuera ni se indexa en buscadores.
+- **Grupos privados.** Se entra sólo con un link de invitación. Los grupos no
+  son visibles desde afuera ni se indexan: sólo la portada y el login llegan a
+  un buscador, con lista blanca por ruta (ver «Indexación selectiva»).
 - **Predicciones que se ganan el lugar.** Toda predicción creada por alguien
-  entra *en prueba*: si en 48 horas no la eligen al menos 3 personas, se va sola
-  y no ensucia el feed.
+  entra *en prueba*: si en el plazo que le pusieron no la elige el porcentaje
+  del grupo que pide, se va sola y no ensucia el feed. El umbral es un
+  porcentaje de los integrantes vivos, así que crece y baja con el grupo.
+- **Cierre por fecha o por pedido.** Una predicción puede cerrar en una fecha o
+  quedar abierta hasta que el grupo pida cerrarla. Pedirlo requiere haber
+  votado, y hace falta quórum: nadie llega tarde con la respuesta ya sabida.
 - **Nadie se influye.** Hasta el cierre se muestra cuánta gente participó, pero
   no qué eligió cada una. Lo garantiza la base de datos, no la interfaz.
 - **Dos modos de votación.** Clásica (un voto, cambiable hasta el cierre) y
@@ -474,10 +479,21 @@ visual consistente desde el primer segundo.
 **Magic Link y nada más.** Pedirle a alguien que invente y recuerde una
 contraseña para votar si Fran llega tarde es fricción sin beneficio.
 
-**El umbral no se puede configurar hacia abajo.** `create_prediction()` acota
-`minimum_participants` a un mínimo de 3 en el servidor. Si el cliente pudiera
-mandar 1, cualquiera calificaría su propia predicción con su propio voto y el
-estado «En prueba» dejaría de existir.
+**El umbral es un porcentaje, no un número fijo.** `create_prediction()` guarda
+`qualification_percent` y el requisito se calcula EN VIVO contra los
+integrantes del grupo con `required_participants()`, acotado siempre al conteo
+real. Antes era un mínimo fijo de 3 acotado con `greatest(3, …)`, y eso tenía
+un agujero: en un grupo de 2 el requisito era inalcanzable y toda predicción
+expiraba. Un porcentaje con tope en la cantidad de integrantes no puede pedir
+más gente de la que existe, y sube solo cuando entra gente nueva.
+
+**Indexación selectiva.** `server/src/robots.ts` es una lista blanca
+*default-deny*: toda ruta manda `noindex, nofollow` salvo `/` y `/entrar`. Una
+ruta nueva nace privada; para hacerla indexable hay que sumarla a propósito.
+`src/lib/indexing.ts` mantiene la copia del meta del cliente y un test compara
+las dos listas para que no deriven. El header del servidor es el que manda: no
+depende de JS, y los crawlers combinan header y meta quedándose con la
+directiva más restrictiva.
 
 **Las predicciones del sistema entran por otra puerta.** `is_default` no es un
 parámetro de `create_prediction()`: existe una función aparte que copia texto,

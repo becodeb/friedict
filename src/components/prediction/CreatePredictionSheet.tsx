@@ -3,15 +3,22 @@ import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CaretDown, Plus, Sparkle, X } from '@phosphor-icons/react'
 import { cn } from '@/lib/cn'
-import { createPredictionSchema, type CreatePredictionInput } from '@/lib/validation'
+import {
+  createPredictionSchema,
+  roundsBeforeClose,
+  type CreatePredictionInput,
+} from '@/lib/validation'
+import { requiredParticipantsPreview } from '@/lib/prediction'
 import { friendlyError } from '@/lib/errors'
 import { nextRoundHour, toDateTimeLocalValue } from '@/lib/time'
 import { useCreateFromTemplate, useCreatePrediction, useTemplates } from '@/data/predictions'
+import { useMembers } from '@/data/groups'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
 import { TextField, TextAreaField } from '@/components/ui/Field'
 import { Segmented } from '@/components/ui/Segmented'
 import { Toggle } from '@/components/ui/Toggle'
+import { HelpTip } from '@/components/ui/HelpTip'
 import { useToast } from '@/components/ui/toast-context'
 
 /**
@@ -21,6 +28,10 @@ import { useToast } from '@/components/ui/toast-context'
  * opciones arriba, el cierre después, y todo lo configurable escondido detrás
  * de "Más opciones". Si alguien tiene que pensar en `votes_visibility` para
  * preguntar quién llega tarde, el producto falló.
+ *
+ * Zona 2 (El cierre) es la jugada clave: el quórum de cierre NO es un ajuste
+ * avanzado cuando no hay fecha — es la única regla de cierre que existe, así
+ * que vive junto a la elección que lo crea.
  *
  * Validación con React Hook Form + Zod, con el mismo esquema que se usa en los
  * tests. Los límites reales igual están como CHECK constraints en la base.
@@ -35,6 +46,21 @@ const VOTES_OPTIONS = [
   { value: 'on_close' as const, label: 'Al cerrar' },
   { value: 'visible' as const, label: 'Siempre visible' },
   { value: 'anonymous' as const, label: 'Nunca' },
+]
+
+// Dos listas y no una: los valores por defecto de cada ajuste son distintos
+// (60% para calificar, 50% para cerrar) y un preset que no incluya el default
+// deja el grupo de segmentos sin ninguno marcado al abrir el formulario.
+const QUALIFICATION_PRESETS = [
+  { value: '30' as const, label: 'Pocos', description: '30%' },
+  { value: '60' as const, label: 'La mayoría', description: '60%' },
+  { value: '80' as const, label: 'Casi todos', description: '80%' },
+]
+
+const CLOSE_PRESETS = [
+  { value: '30' as const, label: 'Pocos', description: '30%' },
+  { value: '50' as const, label: 'La mitad', description: '50%' },
+  { value: '80' as const, label: 'Casi todos', description: '80%' },
 ]
 
 export function CreatePredictionSheet({
@@ -52,8 +78,10 @@ export function CreatePredictionSheet({
   const createPrediction = useCreatePrediction()
   const createFromTemplate = useCreateFromTemplate()
   const templates = useTemplates()
+  const members = useMembers(groupId)
   const [advanced, setAdvanced] = useState(false)
 
+  const memberCount = members.data?.length ?? 0
   const defaultCloses = toDateTimeLocalValue(nextRoundHour(new Date(), 48))
 
   const form = useForm<CreatePredictionInput>({
@@ -68,7 +96,10 @@ export function CreatePredictionSheet({
       allowNewOptions: false,
       resultsVisibility: 'on_close',
       votesVisibility: 'on_close',
+      closeMode: 'date',
       closesAt: defaultCloses,
+      qualificationPercent: 60,
+      closePercent: 50,
       qualificationHours: 48,
     },
   })
@@ -84,9 +115,15 @@ export function CreatePredictionSheet({
   const options = useWatch({ control, name: 'options' }) ?? []
   const optionType = useWatch({ control, name: 'optionType' })
   const votingMode = useWatch({ control, name: 'votingMode' })
+  const intervalDays = useWatch({ control, name: 'intervalDays' })
   const allowNewOptions = useWatch({ control, name: 'allowNewOptions' })
   const resultsVisibility = useWatch({ control, name: 'resultsVisibility' })
   const votesVisibility = useWatch({ control, name: 'votesVisibility' })
+  const closeMode = useWatch({ control, name: 'closeMode' })
+  const closesAtValue = useWatch({ control, name: 'closesAt' })
+  const qualificationPercent = useWatch({ control, name: 'qualificationPercent' })
+  const closePercent = useWatch({ control, name: 'closePercent' })
+  const qualificationHours = useWatch({ control, name: 'qualificationHours' })
 
   // Al cerrarse, el formulario vuelve a cero. `setAdvanced` se ajusta durante
   // el render comparando contra el valor anterior; `reset()` no es estado de
@@ -101,9 +138,16 @@ export function CreatePredictionSheet({
     if (!open) reset()
   }, [open, reset])
 
-  const onSubmit = handleSubmit((values) => {
-    const closesAt = new Date(values.closesAt).toISOString()
+  const requiredParticipants = requiredParticipantsPreview(memberCount, qualificationPercent)
+  const rounds =
+    votingMode === 'recurring' && intervalDays
+      ? roundsBeforeClose(
+          closeMode === 'date' && closesAtValue ? new Date(closesAtValue) : null,
+          intervalDays,
+        )
+      : null
 
+  const onSubmit = handleSubmit((values) => {
     createPrediction.mutate(
       {
         groupId,
@@ -116,13 +160,20 @@ export function CreatePredictionSheet({
         allowNewOptions: values.allowNewOptions,
         resultsVisibility: values.resultsVisibility,
         votesVisibility: values.votesVisibility,
-        closesAt,
+        closesAt:
+          values.closeMode === 'date' ? new Date(values.closesAt!).toISOString() : undefined,
+        qualificationPercent: values.qualificationPercent,
+        closePercent: values.closePercent,
         qualificationHours: values.qualificationHours,
       },
       {
         onSuccess: (predictionId) => {
+          const required = requiredParticipantsPreview(memberCount, values.qualificationPercent)
           toast.show({
-            message: 'Queda en prueba: necesita 3 personas para seguir.',
+            message:
+              memberCount > 0
+                ? `Queda en prueba: necesita ${required} de ${memberCount} personas para seguir.`
+                : 'Queda en prueba hasta que junte participación.',
             tone: 'success',
           })
           onClose()
@@ -161,7 +212,11 @@ export function CreatePredictionSheet({
       open={open}
       onClose={onClose}
       title="Nueva predicción"
-      description="Empieza en prueba. Si en 48 horas la eligen 3 personas, queda."
+      description={
+        memberCount > 0
+          ? `Empieza en prueba: necesita que la elija el ${qualificationPercent}% del grupo (${requiredParticipants} de ${memberCount}) en las próximas ${qualificationHours} horas.`
+          : `Empieza en prueba: necesita que la elija el ${qualificationPercent}% del grupo en las próximas ${qualificationHours} horas.`
+      }
       size="lg"
       footer={
         <div className="flex gap-2">
@@ -280,12 +335,47 @@ export function CreatePredictionSheet({
           </div>
         )}
 
-        <TextField
-          label="¿Cuándo cierra?"
-          type="datetime-local"
-          error={formState.errors.closesAt?.message}
-          {...register('closesAt')}
+        {/* Zona 2: El cierre. La regla de cierre no es un detalle avanzado
+            cuando no hay fecha — es la ÚNICA que existe, así que va acá,
+            junto a la elección que la crea. */}
+        <Segmented
+          legend="¿Cuándo cierra?"
+          value={closeMode}
+          onChange={(next) => setValue('closeMode', next, { shouldValidate: true })}
+          options={[
+            { value: 'date', label: 'Con fecha' },
+            { value: 'open', label: 'Cuando lo pida el grupo' },
+          ]}
+          help={
+            <HelpTip label="cuándo cierra">
+              Con fecha, cierra sola. Sin fecha, sigue abierta hasta que una parte del
+              grupo pida cerrarla — sirve para preguntas sin un momento claro de cierre.
+            </HelpTip>
+          }
         />
+
+        {closeMode === 'date' ? (
+          <TextField
+            label="Fecha y hora de cierre"
+            type="datetime-local"
+            error={formState.errors.closesAt?.message}
+            {...register('closesAt')}
+          />
+        ) : (
+          <Segmented
+            legend="¿Cuánta gente tiene que pedir el cierre?"
+            columns={3}
+            value={String(closePercent)}
+            onChange={(next) => setValue('closePercent', Number(next), { shouldValidate: true })}
+            options={CLOSE_PRESETS}
+            help={
+              <HelpTip label="cuánta gente tiene que pedir el cierre">
+                Sólo puede pedirlo quien ya votó. Al llegar al número, cierra al
+                instante — nadie llega tarde ya sabiendo el resultado.
+              </HelpTip>
+            }
+          />
+        )}
 
         <Segmented
           legend="Modo"
@@ -298,14 +388,28 @@ export function CreatePredictionSheet({
         />
 
         {votingMode === 'recurring' && (
-          <TextField
-            label="Cada cuántos días se puede volver a votar"
-            type="number"
-            min={1}
-            max={90}
-            error={formState.errors.intervalDays?.message}
-            {...register('intervalDays', { valueAsNumber: true })}
-          />
+          <>
+            <TextField
+              label="Cada cuántos días se puede volver a votar"
+              type="number"
+              min={1}
+              max={90}
+              trailing={
+                <HelpTip label="cada cuántos días se vuelve a votar">
+                  Las rondas se cuentan desde que la creás, no desde que se confirma.
+                </HelpTip>
+              }
+              error={formState.errors.intervalDays?.message}
+              {...register('intervalDays', { valueAsNumber: true })}
+            />
+            <p className="text-[0.8125rem] text-[var(--ink-3)]">
+              {rounds === null
+                ? 'Sin fecha de cierre, las rondas no tienen techo: se cuentan desde que la creás.'
+                : rounds === 1
+                  ? 'Entra 1 ronda antes del cierre. Las rondas se cuentan desde que la creás.'
+                  : `Entran ${rounds} rondas antes del cierre. Las rondas se cuentan desde que la creás.`}
+            </p>
+          </>
         )}
 
         {/* Ajustes finos, plegados. La mayoría de las predicciones no los toca. */}
@@ -338,28 +442,92 @@ export function CreatePredictionSheet({
           <div className="t-collapse" data-open={advanced}>
             <div>
               <div className="space-y-5 pt-4">
-                <Segmented
-                  legend="Ver los resultados"
-                  columns={3}
-                  value={resultsVisibility}
-                  onChange={(next) => setValue('resultsVisibility', next)}
-                  options={RESULTS_OPTIONS}
-                />
-                <Segmented
-                  legend="Ver quién votó qué"
-                  columns={3}
-                  value={votesVisibility}
-                  onChange={(next) => setValue('votesVisibility', next)}
-                  options={VOTES_OPTIONS}
-                />
-                {optionType === 'manual' && (
-                  <Toggle
-                    label="Dejar que agreguen opciones"
-                    description="Cualquiera del grupo puede sumar alternativas hasta el cierre."
-                    checked={allowNewOptions}
-                    onChange={(next) => setValue('allowNewOptions', next)}
-                  />
-                )}
+                <div>
+                  <h3 className="mb-3 type-meta text-[var(--ink-3)]">
+                    Para que la predicción quede
+                  </h3>
+                  <div className="space-y-4">
+                    <Segmented
+                      legend="¿Cuánta gente tiene que votar?"
+                      columns={3}
+                      value={String(qualificationPercent)}
+                      onChange={(next) =>
+                        setValue('qualificationPercent', Number(next), { shouldValidate: true })
+                      }
+                      options={QUALIFICATION_PRESETS}
+                      help={
+                        <HelpTip label="cuánta gente tiene que votar">
+                          Porcentaje del grupo, no un número fijo: crece y baja con quién
+                          está adentro.
+                        </HelpTip>
+                      }
+                    />
+                    {memberCount > 0 && (
+                      <p className="text-[0.8125rem] text-[var(--ink-3)]">
+                        Con {memberCount} persona{memberCount === 1 ? '' : 's'} en el
+                        grupo, necesita {requiredParticipants}.
+                      </p>
+                    )}
+                    <TextField
+                      label="¿Cuánto tiempo tiene para juntar gente?"
+                      type="number"
+                      min={1}
+                      max={720}
+                      trailing={
+                        <HelpTip label="cuánto tiempo tiene para juntar gente">
+                          Si no llega al quórum antes de este plazo, se va sola y no
+                          ensucia el feed.
+                        </HelpTip>
+                      }
+                      error={formState.errors.qualificationHours?.message}
+                      {...register('qualificationHours', { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t-2 border-[var(--line)] pt-5">
+                  <h3 className="mb-3 type-meta text-[var(--ink-3)]">Quién ve qué</h3>
+                  <div className="space-y-4">
+                    <Segmented
+                      legend="Ver los números"
+                      columns={3}
+                      value={resultsVisibility}
+                      onChange={(next) => setValue('resultsVisibility', next)}
+                      options={RESULTS_OPTIONS}
+                      help={
+                        <HelpTip label="ver los números">
+                          Los recuentos por opción (cuántos votos tiene cada una), sin
+                          decir quién eligió qué.
+                        </HelpTip>
+                      }
+                    />
+                    <Segmented
+                      legend="Ver quién eligió qué"
+                      columns={3}
+                      value={votesVisibility}
+                      onChange={(next) => setValue('votesVisibility', next)}
+                      options={VOTES_OPTIONS}
+                      help={
+                        <HelpTip label="ver quién eligió qué">
+                          Los nombres junto a cada opción. "Siempre visible" los muestra
+                          desde el primer voto, no sólo al cerrar.
+                        </HelpTip>
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t-2 border-[var(--line)] pt-5">
+                  <h3 className="mb-3 type-meta text-[var(--ink-3)]">Extras</h3>
+                  {optionType === 'manual' && (
+                    <Toggle
+                      label="Dejar que agreguen opciones"
+                      description="Cualquiera del grupo puede sumar alternativas hasta el cierre."
+                      checked={allowNewOptions}
+                      onChange={(next) => setValue('allowNewOptions', next)}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>

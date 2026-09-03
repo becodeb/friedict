@@ -1,0 +1,67 @@
+schema: spec-driven
+
+context: |
+  friedict: private group prediction app (React 19 + Vite 7 + TS 5.9 + Tailwind 4).
+  TanStack Query 5, react-hook-form + zod 4, react-router-dom 7.
+  Backend: Node/Express in server/ over plain Postgres (Supabase replaced in 3493f9a).
+  SQL domain logic: db/migrations/*.sql (identity, schema, functions, RLS, notify/cron, auth).
+  UI copy and comments in Rioplatense Spanish; identifiers/types in English.
+
+strict_tdd: true
+
+testing:
+  unit:
+    command: npm run test
+    framework: vitest (jsdom)
+    runnable_here: true
+  typecheck:
+    command: npm run typecheck
+    runnable_here: true
+  lint:
+    command: npm run lint
+    runnable_here: true
+  integration:
+    command: npm run test:integration
+    framework: vitest (node) against integration/**/*.test.ts
+    runnable_here: false
+    reason: requires live Postgres via `npm run db:start` (docker compose); no container running in this environment
+  e2e:
+    command: npm run test:e2e
+    framework: playwright
+    runnable_here: false
+    reason: Playwright browsers not installed in this environment
+  coverage:
+    available: false
+    command: ""
+  formatter:
+    available: false
+    command: ""
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes (especially SQL migrations under db/migrations and mirrored supabase/migrations)
+    - Note whether the change touches server/ (Express/Postgres) or client (src/) or both
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Document RLS/auth implications explicitly when a change touches db/migrations/300_rls.sql or 500_auth_functions.sql
+    - Keep db/migrations/*.sql and supabase/migrations/ in sync when both exist for the same change
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Flag any task that needs npm run test:integration or npm run test:e2e as "not runnable here — requires docker compose / Playwright install"
+  apply:
+    guidelines:
+      - Follow existing code patterns (Rioplatense Spanish UI copy and code comments, English identifiers)
+      - Match existing hook/component conventions in src/components, src/routes, src/lib
+    tdd: true
+    test_command: npm run test
+  verify:
+    test_command: npm run typecheck && npm run lint && npm run test
+    build_command: npm run build
+    coverage_threshold: 0
+    notes: test:integration and test:e2e exist but are not runnable in this environment; do not claim they passed without actually running them
+  archive:
+    - Warn before merging destructive deltas
+    - Warn if a change modified db/migrations without also updating supabase/migrations (or vice versa)
