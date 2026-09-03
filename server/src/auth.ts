@@ -213,10 +213,11 @@ function safeNext(value: unknown): string {
 
 authRouter.get('/google', (req, res) => {
   if (!env.google) {
-    res.status(503).json({
-      error: 'google_not_configured',
-      message: 'El ingreso con Google todavía no está configurado en este servidor.',
-    })
+    // Acá llega alguien que tocó un botón, no un cliente de API: devolverle un
+    // JSON crudo es dejarlo mirando texto plano sin saber qué pasó ni cómo
+    // volver. El callback ya redirigía a /entrar en este mismo caso; esta
+    // rama hacía otra cosa por descuido.
+    res.redirect('/entrar?error=google_no_configurado')
     return
   }
 

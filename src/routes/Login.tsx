@@ -180,7 +180,11 @@ export function Login() {
             role="alert"
             className="mt-4 max-w-sm rounded-[var(--r-md)] border-2 border-[var(--danger)] bg-[var(--danger-wash)] px-3.5 py-3 text-[0.875rem] text-[var(--ink)]"
           >
-            No pudimos completar el ingreso con Google. Probá de nuevo o entrá con tu mail.
+            {googleError === 'google_no_configurado'
+              ? 'Este servidor todavía no tiene configurado el ingreso con Google. Entrá con tu mail y contraseña.'
+              : googleError === 'google_cancelado'
+                ? 'Cancelaste el ingreso con Google. Podés intentarlo de nuevo o entrar con tu mail.'
+                : 'No pudimos completar el ingreso con Google. Probá de nuevo o entrá con tu mail.'}
           </p>
         )}
 
