@@ -241,6 +241,15 @@ Y a mano, en el navegador:
 
 Probá restaurar uno alguna vez. Un backup que nunca se restauró no es un backup.
 
+> **Antes de desplegar `db/migrations/730_drop_prediction_quorum_columns.sql`
+> (change `simpler-prediction-setup`): sacá un backup manual inmediato,**
+> además del cron diario. Esa migración borra `qualification_percent`,
+> `close_percent` y `minimum_participants` de `predictions`, y el único modo de
+> recuperarlos es restaurar desde un backup tomado antes de que corra. El
+> servidor aplica las migraciones pendientes de `db/migrations` solo al
+> arrancar (`server/src/migrate.ts`), así que el backup tiene que existir
+> antes de reiniciar el servicio con el código nuevo.
+
 **Actualizaciones.**
 
 ```bash
