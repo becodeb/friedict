@@ -16,13 +16,23 @@
  * `my_close_request` son derivados: el cliente no conoce el tamaño del grupo,
  * así que el requisito de calificación y de cierre se calculan acá, del lado
  * del servidor, y viajan ya resueltos en la fila.
+ *
+ * `required_participants` y `close_required` salen de `groups g`, no de la
+ * propia predicción: el ajuste de calificación y de cierre son del GRUPO
+ * (`simpler-prediction-setup`), no de cada predicción. El `join` es INNER y
+ * no `left`: si no se puede leer el grupo (la RLS de `groups_select_members`
+ * lo tapa), tampoco se puede leer ninguna de sus predicciones — un `left
+ * join` emitiría una fila con un requisito NULL que el tipo del cliente dice
+ * que es un número.
  */
 export const PREDICTION_SELECT = `
   select
     p.*,
     mc.member_count,
-    public.required_participants(mc.member_count, p.qualification_percent) as required_participants,
-    public.required_close_requests(mc.member_count, p.close_percent)       as close_required,
+    case when not g.qualification_enabled then 0
+         else public.required_participants(mc.member_count, g.qualification_percent)
+    end as required_participants,
+    public.required_close_requests(mc.member_count, g.close_request_quorum) as close_required,
     exists (
       select 1 from public.prediction_close_requests q
        where q.prediction_id = p.id and q.user_id = (select public.current_user_id())
@@ -64,6 +74,7 @@ export const PREDICTION_SELECT = `
       where pr.id = p.created_by
     ) as author
   from public.predictions p
+  join public.groups g on g.id = p.group_id
   left join lateral (
     select count(*)::integer as member_count
       from public.group_members gm

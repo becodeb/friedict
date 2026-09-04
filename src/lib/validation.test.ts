@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPredictionSchema, roundsBeforeClose } from './validation'
+import { createPredictionSchema, groupSettingsSchema, roundsBeforeClose } from './validation'
 
 const DAY_MS = 86_400_000
 
@@ -14,9 +14,7 @@ function baseInput(overrides: Partial<Record<string, unknown>> = {}) {
     votesVisibility: 'on_close' as const,
     closeMode: 'date' as const,
     closesAt: new Date(Date.now() + 48 * 3_600_000).toISOString(),
-    qualificationPercent: 60,
-    closePercent: 50,
-    qualificationHours: 48,
+    voteChangeWindow: '15m' as const,
     ...overrides,
   }
 }
@@ -42,20 +40,58 @@ describe('createPredictionSchema — closeMode', () => {
   })
 })
 
-describe('createPredictionSchema — porcentajes de quórum', () => {
+describe('createPredictionSchema — la fila ya NO tiene los tres campos de quórum', () => {
+  it('el resultado parseado no trae qualificationPercent, closePercent ni qualificationHours', () => {
+    const result = createPredictionSchema.safeParse(baseInput())
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).not.toHaveProperty('qualificationPercent')
+      expect(result.data).not.toHaveProperty('closePercent')
+      expect(result.data).not.toHaveProperty('qualificationHours')
+    }
+  })
+
+  it.each(['until_close', '1d', '15m', 'never'] as const)(
+    'acepta la clave de ventana de voto "%s"',
+    (value) => {
+      const result = createPredictionSchema.safeParse(baseInput({ voteChangeWindow: value }))
+      expect(result.success).toBe(true)
+    },
+  )
+
+  it('rechaza una clave de ventana de voto que no es ninguna de las cuatro', () => {
+    const result = createPredictionSchema.safeParse(baseInput({ voteChangeWindow: 'mañana' }))
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('groupSettingsSchema', () => {
+  function baseGroupInput(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      closeRequestQuorum: 1,
+      qualificationEnabled: false,
+      qualificationPercent: 60,
+      ...overrides,
+    }
+  }
+
   it.each([0, 101, -5])('rechaza qualificationPercent fuera de 1-100 (%i)', (value) => {
-    const result = createPredictionSchema.safeParse(baseInput({ qualificationPercent: value }))
+    const result = groupSettingsSchema.safeParse(baseGroupInput({ qualificationPercent: value }))
     expect(result.success).toBe(false)
   })
 
   it.each([1, 60, 100])('acepta qualificationPercent dentro de 1-100 (%i)', (value) => {
-    const result = createPredictionSchema.safeParse(baseInput({ qualificationPercent: value }))
+    const result = groupSettingsSchema.safeParse(baseGroupInput({ qualificationPercent: value }))
     expect(result.success).toBe(true)
   })
 
-  it.each([0, 101])('rechaza closePercent fuera de 1-100 (%i)', (value) => {
-    const result = createPredictionSchema.safeParse(baseInput({ closePercent: value }))
-    expect(result.success).toBe(false)
+  it('el piso de closeRequestQuorum es 1', () => {
+    expect(groupSettingsSchema.safeParse(baseGroupInput({ closeRequestQuorum: 0 })).success).toBe(
+      false,
+    )
+    expect(groupSettingsSchema.safeParse(baseGroupInput({ closeRequestQuorum: 1 })).success).toBe(
+      true,
+    )
   })
 })
 

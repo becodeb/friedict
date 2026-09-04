@@ -24,6 +24,8 @@ export const DOMAIN_ERRORS: Record<string, string> = {
 
   voting_closed: 'Se cerraron las predicciones.',
   voting_not_open: 'Todavía no se puede votar.',
+  vote_locked: 'Tu voto ya quedó firme: se venció el tiempo para corregirlo.',
+  invalid_vote_window: 'Esa opción de ventana de voto no existe.',
   must_vote_first: 'Tenés que votar antes de pedir el cierre.',
   cycle_vote_used: 'Ya usaste tu voto de esta ronda. Esperá a la próxima.',
   invalid_option: 'Esa opción no es válida.',

@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '@/auth/useAuth'
-import { useGroup, useLeaveGroup, useMembers, useUpdateProfile } from '@/data/groups'
+import {
+  useGroup,
+  useLeaveGroup,
+  useMembers,
+  useUpdateGroupSettings,
+  useUpdateProfile,
+} from '@/data/groups'
 import { friendlyError } from '@/lib/errors'
 import { formatDate } from '@/lib/time'
+import { groupSettingsSchema } from '@/lib/validation'
 import { AvatarPicker } from '@/components/AvatarPicker'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/Field'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Toggle } from '@/components/ui/Toggle'
 import { useToast } from '@/components/ui/toast-context'
 
 interface GroupContext {
@@ -23,7 +31,7 @@ interface GroupContext {
  * una decisión que alguien tiene que tomar antes de poder jugar.
  */
 export function GroupSettings() {
-  const { groupId } = useOutletContext<GroupContext>()
+  const { groupId, isAdmin } = useOutletContext<GroupContext>()
   const navigate = useNavigate()
   const toast = useToast()
   const { user, profile, signOut, refreshProfile } = useAuth()
@@ -31,6 +39,7 @@ export function GroupSettings() {
   const group = useGroup(groupId)
   const members = useMembers(groupId)
   const updateProfile = useUpdateProfile()
+  const updateGroupSettings = useUpdateGroupSettings(groupId)
   const leaveGroup = useLeaveGroup()
 
   const [displayName, setDisplayName] = useState('')
@@ -54,9 +63,43 @@ export function GroupSettings() {
     return () => window.clearTimeout(timer)
   }, [saved])
 
+  // Mismo patrón de siembra que el perfil de arriba: el formulario parte de
+  // valores por default sensatos (nadie ve un campo vacío mientras carga) y
+  // se resiembra una única vez apenas llega la fila real del grupo.
+  const [closeRequestQuorum, setCloseRequestQuorum] = useState(1)
+  const [qualificationEnabled, setQualificationEnabled] = useState(false)
+  const [qualificationPercent, setQualificationPercent] = useState(60)
+  const [settingsSaved, setSettingsSaved] = useState(false)
+  const [syncedGroupId, setSyncedGroupId] = useState<string | null>(null)
+
+  if (group.data && group.data.id !== syncedGroupId) {
+    setSyncedGroupId(group.data.id)
+    setCloseRequestQuorum(group.data.close_request_quorum)
+    setQualificationEnabled(group.data.qualification_enabled)
+    setQualificationPercent(group.data.qualification_percent)
+  }
+
+  useEffect(() => {
+    if (!settingsSaved) return
+    const timer = window.setTimeout(() => setSettingsSaved(false), 2200)
+    return () => window.clearTimeout(timer)
+  }, [settingsSaved])
+
   const myRole = members.data?.find((member) => member.user_id === user?.id)?.role
   const dirty =
     profile && (displayName !== profile.display_name || accent !== profile.accent)
+
+  const memberCount = members.data?.length
+  const settingsParsed = groupSettingsSchema.safeParse({
+    closeRequestQuorum,
+    qualificationEnabled,
+    qualificationPercent,
+  })
+  const settingsDirty =
+    group.data !== undefined &&
+    (closeRequestQuorum !== group.data.close_request_quorum ||
+      qualificationEnabled !== group.data.qualification_enabled ||
+      qualificationPercent !== group.data.qualification_percent)
 
   return (
     <div className="feed-column pt-5">
@@ -140,6 +183,80 @@ export function GroupSettings() {
           puede entrar, y nada de lo que pasa acá adentro es visible desde afuera
           ni aparece en buscadores.
         </p>
+      </section>
+
+      <section
+        className="mt-10 border-t border-[var(--line)] pt-5"
+        aria-labelledby="funcionamiento-titulo"
+      >
+        <h2 id="funcionamiento-titulo" className="type-meta text-[var(--ink-3)]">
+          Cómo funciona este grupo
+        </h2>
+
+        {isAdmin ? (
+          <div className="mt-3 max-w-md space-y-4">
+            <Toggle
+              label="Calificación opcional"
+              description="Prendida, una predicción nueva nace «en prueba» hasta que el grupo la elija. Apagada (default), nace activa directamente."
+              checked={qualificationEnabled}
+              onChange={setQualificationEnabled}
+            />
+            {qualificationEnabled && (
+              <TextField
+                label="Porcentaje del grupo que tiene que elegirla"
+                type="number"
+                min={1}
+                max={100}
+                value={qualificationPercent}
+                onChange={(event) => setQualificationPercent(Number(event.target.value))}
+              />
+            )}
+            <TextField
+              label="Quórum de cierre: cuánta gente tiene que pedirlo en una predicción sin fecha"
+              hint="Con 1 alcanza si confiás en el grupo. Se acota solo al conteo vivo de integrantes."
+              type="number"
+              min={1}
+              max={memberCount}
+              value={closeRequestQuorum}
+              onChange={(event) => setCloseRequestQuorum(Number(event.target.value))}
+            />
+            <Button
+              disabled={!settingsDirty || !settingsParsed.success}
+              loading={updateGroupSettings.isPending}
+              succeeded={settingsSaved}
+              onClick={() =>
+                updateGroupSettings.mutate(
+                  { closeRequestQuorum, qualificationEnabled, qualificationPercent },
+                  {
+                    onSuccess: () => setSettingsSaved(true),
+                    onError: (error) =>
+                      toast.show({ message: friendlyError(error), tone: 'error' }),
+                  },
+                )
+              }
+            >
+              Guardar ajustes del grupo
+            </Button>
+          </div>
+        ) : (
+          <dl className="mt-3 space-y-2 text-[0.9375rem]">
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--ink-3)]">Calificación</dt>
+              <dd className="text-right">
+                {group.data?.qualification_enabled
+                  ? `Prendida (${group.data.qualification_percent}%)`
+                  : 'Apagada'}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--ink-3)]">Quórum de cierre</dt>
+              <dd className="text-right tabular">{group.data?.close_request_quorum ?? '—'}</dd>
+            </div>
+            <p className="mt-3 max-w-[46ch] type-micro text-[var(--ink-3)]">
+              Sólo quien administra el grupo puede cambiar esto.
+            </p>
+          </dl>
+        )}
       </section>
 
       <section className="mt-10 border-t border-[var(--line)] pt-5" aria-labelledby="cuenta-titulo">

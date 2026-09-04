@@ -34,6 +34,7 @@ const RPC_PUBLICA = new Set([
   'finalize_predictions',
   'request_close',
   'withdraw_close_request',
+  'update_group_settings',
   // Helpers de autorización y cálculo, sin efectos ni datos ajenos
   'is_group_member',
   'group_role',
@@ -46,6 +47,9 @@ const RPC_PUBLICA = new Set([
   'current_cycle',
   'required_participants',
   'required_close_requests',
+  // duration_multiplier es un cálculo puro (igual que calculate_points): el
+  // cliente lo usa para previsualizar puntos antes de cerrar la predicción.
+  'duration_multiplier',
   // Identidad: la lee cada política RLS, así que tiene que ser ejecutable.
   'current_user_id',
   // Autenticación. Viven acá y no en el servidor para que el rol de la app no
@@ -126,6 +130,10 @@ describe('superficie de la API', () => {
       'on_vote_changed',
       'on_option_created',
       'group_member_count',
+      'vote_change_window_of',
+      'add_member_option',
+      'sync_member_options',
+      'on_member_joined',
     ]
 
     for (const nombre of internas) {

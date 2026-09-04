@@ -150,24 +150,33 @@ export type Database = {
       }
       groups: {
         Row: {
+          close_request_quorum: number
           created_at: string
           created_by: string
           id: string
           name: string
+          qualification_enabled: boolean
+          qualification_percent: number
           updated_at: string
         }
         Insert: {
+          close_request_quorum?: number
           created_at?: string
           created_by: string
           id?: string
           name: string
+          qualification_enabled?: boolean
+          qualification_percent?: number
           updated_at?: string
         }
         Update: {
+          close_request_quorum?: number
           created_at?: string
           created_by?: string
           id?: string
           name?: string
+          qualification_enabled?: boolean
+          qualification_percent?: number
           updated_at?: string
         }
         Relationships: [
@@ -331,6 +340,7 @@ export type Database = {
           conviction_multiplier: number
           correct: boolean
           created_at: string
+          duration_multiplier: number
           early_multiplier: number
           group_id: string
           points: number
@@ -342,6 +352,7 @@ export type Database = {
           conviction_multiplier?: number
           correct?: boolean
           created_at?: string
+          duration_multiplier?: number
           early_multiplier?: number
           group_id: string
           points?: number
@@ -353,6 +364,7 @@ export type Database = {
           conviction_multiplier?: number
           correct?: boolean
           created_at?: string
+          duration_multiplier?: number
           early_multiplier?: number
           group_id?: string
           points?: number
@@ -427,8 +439,10 @@ export type Database = {
         Row: {
           created_at: string
           cycle: number
+          first_cast_at: string
           id: string
           option_id: string
+          option_selected_at: string
           prediction_id: string
           updated_at: string
           user_id: string
@@ -436,8 +450,10 @@ export type Database = {
         Insert: {
           created_at?: string
           cycle?: number
+          first_cast_at?: string
           id?: string
           option_id: string
+          option_selected_at?: string
           prediction_id: string
           updated_at?: string
           user_id: string
@@ -445,8 +461,10 @@ export type Database = {
         Update: {
           created_at?: string
           cycle?: number
+          first_cast_at?: string
           id?: string
           option_id?: string
+          option_selected_at?: string
           prediction_id?: string
           updated_at?: string
           user_id?: string
@@ -478,7 +496,6 @@ export type Database = {
       predictions: {
         Row: {
           allow_new_options: boolean
-          close_percent: number
           close_request_count: number
           closed_at: string | null
           closes_at: string | null
@@ -488,12 +505,10 @@ export type Database = {
           group_id: string
           id: string
           is_default: boolean
-          minimum_participants: number
           opens_at: string
           option_type: Database["public"]["Enums"]["option_source"]
           participant_count: number
-          qualification_deadline: string
-          qualification_percent: number
+          qualification_deadline: string | null
           resolved_at: string | null
           resolved_option_id: string | null
           results_visibility: Database["public"]["Enums"]["results_visibility"]
@@ -501,6 +516,7 @@ export type Database = {
           template_id: string | null
           title: string
           updated_at: string
+          vote_change_window: string | null
           vote_count: number
           vote_interval: string | null
           votes_visibility: Database["public"]["Enums"]["votes_visibility"]
@@ -508,7 +524,6 @@ export type Database = {
         }
         Insert: {
           allow_new_options?: boolean
-          close_percent?: number
           close_request_count?: number
           closed_at?: string | null
           closes_at?: string | null
@@ -518,12 +533,10 @@ export type Database = {
           group_id: string
           id?: string
           is_default?: boolean
-          minimum_participants?: number
           opens_at?: string
           option_type?: Database["public"]["Enums"]["option_source"]
           participant_count?: number
-          qualification_deadline: string
-          qualification_percent?: number
+          qualification_deadline?: string | null
           resolved_at?: string | null
           resolved_option_id?: string | null
           results_visibility?: Database["public"]["Enums"]["results_visibility"]
@@ -531,6 +544,7 @@ export type Database = {
           template_id?: string | null
           title: string
           updated_at?: string
+          vote_change_window?: string | null
           vote_count?: number
           vote_interval?: string | null
           votes_visibility?: Database["public"]["Enums"]["votes_visibility"]
@@ -538,7 +552,6 @@ export type Database = {
         }
         Update: {
           allow_new_options?: boolean
-          close_percent?: number
           close_request_count?: number
           closed_at?: string | null
           closes_at?: string | null
@@ -548,12 +561,10 @@ export type Database = {
           group_id?: string
           id?: string
           is_default?: boolean
-          minimum_participants?: number
           opens_at?: string
           option_type?: Database["public"]["Enums"]["option_source"]
           participant_count?: number
-          qualification_deadline?: string
-          qualification_percent?: number
+          qualification_deadline?: string | null
           resolved_at?: string | null
           resolved_option_id?: string | null
           results_visibility?: Database["public"]["Enums"]["results_visibility"]
@@ -561,6 +572,7 @@ export type Database = {
           template_id?: string | null
           title?: string
           updated_at?: string
+          vote_change_window?: string | null
           vote_count?: number
           vote_interval?: string | null
           votes_visibility?: Database["public"]["Enums"]["votes_visibility"]
@@ -805,16 +817,14 @@ export type Database = {
       create_prediction: {
         Args: {
           p_allow_new_options?: boolean
-          p_close_percent?: number
           p_closes_at?: string | null
           p_description?: string
           p_group_id: string
           p_option_type?: Database["public"]["Enums"]["option_source"]
           p_options: string[]
-          p_qualification_hours?: number
-          p_qualification_percent?: number
           p_results_visibility?: Database["public"]["Enums"]["results_visibility"]
           p_title: string
+          p_vote_change_window?: string
           p_vote_interval?: string
           p_votes_visibility?: Database["public"]["Enums"]["votes_visibility"]
           p_voting_mode?: Database["public"]["Enums"]["voting_mode"]
@@ -825,7 +835,6 @@ export type Database = {
         Args: {
           p_closes_at: string
           p_group_id: string
-          p_qualification_hours?: number
           p_template_id: string
         }
         Returns: string
@@ -834,6 +843,7 @@ export type Database = {
         Args: { p_at?: string; p_interval: string; p_opens_at: string }
         Returns: number
       }
+      duration_multiplier: { Args: { p_span: string }; Returns: number }
       enforce_rate_limit: {
         Args: { p_bucket: string; p_max: number; p_window: string }
         Returns: undefined
@@ -876,7 +886,7 @@ export type Database = {
         Returns: number
       }
       required_close_requests: {
-        Args: { p_member_count: number; p_percent: number }
+        Args: { p_member_count: number; p_quorum: number }
         Returns: number
       }
       require_auth: { Args: never; Returns: string }
@@ -886,6 +896,30 @@ export type Database = {
         Returns: undefined
       }
       shares_group_with: { Args: { p_user_id: string }; Returns: boolean }
+      update_group_settings: {
+        Args: {
+          p_close_request_quorum?: number
+          p_group_id: string
+          p_qualification_enabled?: boolean
+          p_qualification_percent?: number
+        }
+        Returns: {
+          close_request_quorum: number
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          qualification_enabled: boolean
+          qualification_percent: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "groups"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_member_role: {
         Args: {
           p_group_id: string

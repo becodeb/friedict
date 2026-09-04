@@ -108,6 +108,42 @@ export function useLeaveGroup() {
   })
 }
 
+export interface UpdateGroupSettingsInput {
+  closeRequestQuorum?: number
+  qualificationEnabled?: boolean
+  qualificationPercent?: number
+}
+
+/**
+ * Único escritor de `close_request_quorum` / `qualification_enabled` /
+ * `qualification_percent`. Invalida `qk.group` Y `qk.predictions`: los
+ * requisitos derivados (`required_participants`, `close_required`) viajan en
+ * cada fila de predicción, así que un cambio de ajustes tiene que refrescarlas
+ * también, no sólo la fila del grupo.
+ */
+export function useUpdateGroupSettings(groupId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateGroupSettingsInput) =>
+      rpc<Group>('update_group_settings', {
+        p_group_id: groupId,
+        ...(input.closeRequestQuorum !== undefined
+          ? { p_close_request_quorum: input.closeRequestQuorum }
+          : {}),
+        ...(input.qualificationEnabled !== undefined
+          ? { p_qualification_enabled: input.qualificationEnabled }
+          : {}),
+        ...(input.qualificationPercent !== undefined
+          ? { p_qualification_percent: input.qualificationPercent }
+          : {}),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: qk.group(groupId) })
+      void queryClient.invalidateQueries({ queryKey: qk.predictions(groupId) })
+    },
+  })
+}
+
 export function useUpdateMemberRole(groupId: string) {
   const queryClient = useQueryClient()
   return useMutation({

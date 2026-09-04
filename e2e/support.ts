@@ -9,6 +9,7 @@ const APP_DB_URL =
 
 export const SEED = {
   losPibes: 'aaaaaaaa-0000-4000-8000-000000000001',
+  futbol5: 'aaaaaaaa-0000-4000-8000-000000000002',
   enPrueba: 'bbbbbbbb-0000-4000-8000-000000000001',
   cerrada: 'bbbbbbbb-0000-4000-8000-000000000003',
   resuelta: 'bbbbbbbb-0000-4000-8000-000000000004',
@@ -48,7 +49,7 @@ async function asUser(userId: string, text: string, params: unknown[] = []): Pro
   }
 }
 
-async function userIdFor(email: string): Promise<string> {
+export async function userIdFor(email: string): Promise<string> {
   const rows = (await sql('select id from public.users where email = $1', [email])) as Array<{
     id: string
   }>
@@ -103,16 +104,34 @@ export async function useLightTheme(page: Page): Promise<void> {
   })
 }
 
-/** Corre las fechas de una predicción hacia el pasado y reevalúa los estados. */
-export async function timeTravel(predictionId: string, shift: string): Promise<void> {
+/**
+ * Corre las fechas de una predicción hacia el pasado y reevalúa los estados.
+ *
+ * `qualification_deadline` ya no se mueve — nada la lee (nada expira más).
+ * `firstCastAtUserId` es opcional y sirve para simular el paso del tiempo
+ * sobre la ventana de cambio de voto de una persona puntual, sin tocar
+ * `created_at` (ver el comentario largo en `705_vote_window_and_scoring.sql`).
+ */
+export async function timeTravel(
+  predictionId: string,
+  shift: string,
+  options: { firstCastAtUserId?: string } = {},
+): Promise<void> {
   await sql(
     `update public.predictions
         set opens_at = opens_at - $2::interval,
-            qualification_deadline = qualification_deadline - $2::interval,
             closes_at = closes_at - $2::interval
       where id = $1`,
     [predictionId, shift],
   )
+  if (options.firstCastAtUserId) {
+    await sql(
+      `update public.prediction_votes
+          set first_cast_at = first_cast_at - $3::interval
+        where prediction_id = $1 and user_id = $2`,
+      [predictionId, options.firstCastAtUserId, shift],
+    )
+  }
   await sql('select public.finalize_predictions()')
 }
 

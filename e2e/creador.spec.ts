@@ -72,10 +72,12 @@ test.describe('flujo del creador', () => {
     await sheet.getByPlaceholder('No').fill('No, se juega igual')
     await sheet.getByRole('button', { name: /crear predicción/i }).click()
 
-    // Aparece en el feed, en prueba y esperando gente
+    // Un grupo NUEVO arranca con la calificación apagada (default de
+    // `groups.qualification_enabled`): la predicción queda activa apenas se
+    // crea, sin "En prueba" ni umbral de participación que juntar.
     await expect(page.getByText('¿Llueve el jueves y se suspende?')).toBeVisible()
-    await expect(page.getByText('En prueba').first()).toBeVisible()
-    await expect(page.getByText(/faltan 3 personas para que siga/i)).toBeVisible()
+    await expect(page.getByText('En prueba')).toHaveCount(0)
+    await expect(page.getByText('Abierta').first()).toBeVisible()
   })
 
   test('resuelve una predicción cerrada con confirmación de otra persona', async ({
@@ -122,10 +124,15 @@ test.describe('flujo del creador', () => {
     await expect(page.getByText('pasó')).toBeVisible()
   })
 
-  test('una predicción con 2 participantes desaparece del feed al vencer el plazo', async ({
+  test('una predicción con 2 de 3 participantes se queda "en prueba" para siempre: nada expira', async ({
     page,
   }) => {
     await useLightTheme(page)
+    // «Los pibes» tiene la calificación prendida (seed) al 60% de 5
+    // integrantes: hacen falta 3. Con sólo 2 votos, se queda esperando.
+    // El cierre se pone bien lejos (1000 días) para que, después de adelantar
+    // el reloj 400 días más abajo, closes_at siga sin llegar — lo que se
+    // prueba es la ausencia de expiración por participación, no el cierre.
     const predictionId = await (
       await import('./support')
     ).createPredictionAs(
@@ -133,7 +140,7 @@ test.describe('flujo del creador', () => {
       SEED.losPibes,
       '¿Alguien se acuerda de traer hielo?',
       ['Sí', 'No'],
-      72,
+      24 * 1000,
     )
 
     await voteAs('bauti@cantado.test', predictionId, 'Sí')
@@ -146,17 +153,14 @@ test.describe('flujo del creador', () => {
     await expect(enElFeed).toBeVisible()
     await expect(page.getByText(/falta una persona para que siga/i)).toBeVisible()
 
-    // Vence el plazo sin la tercera persona.
-    await timeTravel(predictionId, '3 days')
-    expect(await statusOf(predictionId)).toBe('expired')
+    // Pasa mucho tiempo — antes de este cambio, esto la expiraba. Ahora se
+    // queda exactamente donde estaba, en el feed, en prueba.
+    await timeTravel(predictionId, '400 days')
+    expect(await statusOf(predictionId)).toBe('proposed')
 
     await page.reload()
-    await expect(enElFeed).toHaveCount(0)
-
-    // Pero queda en el historial: no se borra, se corre del feed.
-    await page.goto(`/g/${SEED.losPibes}/historial`)
-    await expect(page.getByText('¿Alguien se acuerda de traer hielo?').first()).toBeVisible()
-    await expect(page.getByText(/no juntó gente/i).first()).toBeVisible()
+    await expect(enElFeed).toBeVisible()
+    await expect(page.getByText(/falta una persona para que siga/i)).toBeVisible()
   })
 
   test('con el tercer voto la predicción queda confirmada', async ({ page }) => {

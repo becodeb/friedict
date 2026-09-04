@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   BASE_POINTS,
+  MAX_DURATION,
   MAX_EARLY,
   MAX_RARITY,
   RARITY_MIN_SAMPLE,
   calculatePoints,
   convictionMultiplier,
+  durationMultiplier,
   earlyMultiplier,
   explainScore,
   rarityMultiplier,
@@ -74,7 +76,7 @@ describe('calculatePoints', () => {
     ).toBe(BASE_POINTS)
   })
 
-  it('nunca supera el techo de 225', () => {
+  it('nunca supera el techo de 225 a la base de 100', () => {
     const max = calculatePoints({
       winnerShare: 0,
       sampleSize: 999,
@@ -83,6 +85,19 @@ describe('calculatePoints', () => {
     })
     expect(max).toBe(225)
     expect(max).toBe(Math.round(BASE_POINTS * MAX_RARITY * MAX_EARLY * 1))
+  })
+
+  it('el techo REAL, con la duración en su tope de 3×, es 675', () => {
+    const scaledBase = Math.round(BASE_POINTS * MAX_DURATION)
+    const max = calculatePoints({
+      base: scaledBase,
+      winnerShare: 0,
+      sampleSize: 999,
+      earlyRatio: 1,
+      convictionRatio: 1,
+    })
+    expect(max).toBe(675)
+    expect(max).toBe(Math.round(BASE_POINTS * MAX_DURATION * MAX_RARITY * MAX_EARLY * 1))
   })
 
   it('nunca devuelve puntos negativos', () => {
@@ -139,6 +154,32 @@ describe('calculatePoints', () => {
   })
 })
 
+describe('durationMultiplier', () => {
+  it('coincide con los puntos de referencia de la curva', () => {
+    expect(durationMultiplier(1)).toBe(1.0)
+    expect(durationMultiplier(10)).toBe(1.75)
+    expect(durationMultiplier(100)).toBe(2.5)
+    // round(1 + 0.75·log10(365), 2) = 2.92, no 2.93 — verificado también
+    // contra Postgres en integration/scoring-parity.test.ts.
+    expect(durationMultiplier(365)).toBe(2.92)
+    expect(durationMultiplier(4000)).toBe(MAX_DURATION)
+  })
+
+  it('nunca baja de 1.00×, incluso con menos de un día', () => {
+    expect(durationMultiplier(0.5)).toBe(1.0)
+  })
+
+  it('nunca supera el techo de 3.00×, ni con tramos absurdamente largos', () => {
+    expect(durationMultiplier(100_000)).toBe(MAX_DURATION)
+  })
+
+  it('trata una entrada no finita como 1 día (1.00×), sin lanzar', () => {
+    expect(durationMultiplier(Number.NaN)).toBe(1.0)
+    expect(durationMultiplier(Number.POSITIVE_INFINITY)).toBe(1.0)
+    expect(durationMultiplier(-5)).toBe(1.0)
+  })
+})
+
 describe('explainScore', () => {
   it('desglosa el total en factores que multiplicados dan el mismo número', () => {
     const input = {
@@ -150,10 +191,30 @@ describe('explainScore', () => {
     const breakdown = explainScore(input)
 
     expect(breakdown.total).toBe(calculatePoints(input))
+    expect(breakdown.duration).toBe(1)
     expect(
       Math.round(
-        breakdown.base * breakdown.rarity * breakdown.early * breakdown.conviction,
+        breakdown.base * breakdown.rarity * breakdown.early * breakdown.conviction * breakdown.duration,
       ),
     ).toBe(breakdown.total)
+  })
+
+  it('con durationDays, el total refleja la base escalada', () => {
+    const input = {
+      winnerShare: 1,
+      sampleSize: 10,
+      earlyRatio: 0,
+      convictionRatio: 1,
+      durationDays: 100,
+    }
+    const breakdown = explainScore(input)
+
+    expect(breakdown.duration).toBe(2.5)
+    expect(breakdown.base).toBe(BASE_POINTS)
+    // Base 100 × 2.5 = 250, sin rareza (sampleSize<4 no aplica acá; con
+    // winnerShare 1 la rareza es 1 igual) ni anticipación (earlyRatio 0):
+    // 250 × 1 × 1 × (0.5 + 0.5·1) = 250.
+    expect(breakdown.total).toBe(250)
+    expect(breakdown.total).not.toBe(calculatePoints(input))
   })
 })

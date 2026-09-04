@@ -12,7 +12,7 @@
  */
 
 import type { Prediction, PredictionStatus, PredictionRow, Vote } from './types'
-import { parsePgInterval, toDate } from './time'
+import { DAY, HOUR, MINUTE, parsePgInterval, toDate } from './time'
 
 /** ¿La predicción juntó la participación que necesitaba? */
 export function hasQualified(
@@ -33,14 +33,19 @@ export function participantsMissing(
 }
 
 /**
- * `required_participants` es OBLIGATORIO, no opcional con un fallback a
- * `minimum_participants`: un fallback reintroduciría en silencio el bug de
- * los grupos chicos en cualquier payload que se olvide de mandarlo.
- * TypeScript obliga a que todo call site lo provea.
+ * `required_participants` es OBLIGATORIO, no opcional con un fallback a un
+ * mínimo fijo: un fallback reintroduciría en silencio el bug de los grupos
+ * chicos en cualquier payload que se olvide de mandarlo. TypeScript obliga a
+ * que todo call site lo provea. Cuando el grupo no pide calificar,
+ * `required_participants` llega en 0 (ver `PREDICTION_SELECT` y
+ * `notify_change()`), así que `hasQualified` siempre da `true`.
+ *
+ * `qualification_deadline` NO está acá: nada expira más, así que
+ * `effectiveStatus` no tiene ninguna razón para leerla.
  */
 export type StatusInput = Pick<
   PredictionRow,
-  'status' | 'is_default' | 'participant_count' | 'qualification_deadline' | 'closes_at'
+  'status' | 'is_default' | 'participant_count' | 'closes_at'
 > & { required_participants: number }
 
 /** `closes_at` nulo = sin cierre por fecha: se trata como "infinitamente lejos". */
@@ -53,6 +58,12 @@ function closesAtMs(prediction: Pick<StatusInput, 'closes_at'>): number {
 /**
  * Estado efectivo en este instante. Mismo orden de evaluación que
  * `public.finalize_predictions()`.
+ *
+ * Nada expira más: una fila que YA está `expired` (de antes de este cambio)
+ * se queda `expired` para siempre — es un estado terminal, igual que
+ * `resolved`/`cancelled` — pero ninguna fila `proposed` puede aterrizar ahí.
+ * `finalize_predictions()` del lado del servidor perdió el paso entero que lo
+ * hacía; este espejo pierde la rama que lo leía.
  */
 export function effectiveStatus(
   prediction: StatusInput,
@@ -78,19 +89,17 @@ export function effectiveStatus(
   const closesMs = closesAtMs(prediction)
 
   if (status === 'proposed') {
-    // 1) venció el plazo sin juntar gente
-    if (!qualified && toDate(prediction.qualification_deadline).getTime() <= now.getTime()) {
-      return 'expired'
-    }
-    // 2) juntó la gente
+    // Juntó la gente (o el grupo no pide calificar, reflejado en un
+    // required_participants de 0).
     if (qualified) {
       return closesMs <= now.getTime() ? 'closed' : 'active'
     }
-    // sigue en prueba
+    // Sigue en prueba: sin plazo que vencer, esto ya no tiene más salida que
+    // "activa" (cuando califique) o "cerrada" (si tiene fecha y llegó).
     return closesMs <= now.getTime() ? 'closed' : 'proposed'
   }
 
-  // 3) llegó el cierre. Sin closes_at (Infinity), esta rama nunca dispara: una
+  // Llegó el cierre. Sin closes_at (Infinity), esta rama nunca dispara: una
   // predicción abierta jamás cierra sola por fecha, a ningún `now`.
   if (status === 'active' && closesMs <= now.getTime()) {
     return 'closed'
@@ -187,13 +196,19 @@ export function voteForCurrentCycle(
 export interface VoteAvailability {
   canVote: boolean
   /** Motivo por el que no se puede, para mostrarlo tal cual. */
-  reason: null | 'closed' | 'cycle_used' | 'not_open_yet'
+  reason: null | 'closed' | 'cycle_used' | 'not_open_yet' | 'vote_locked'
   /** En evolutivas, cuándo se habilita el próximo voto. */
   nextAt: Date | null
 }
 
+/**
+ * Espejo de la ventana de cambio de voto en `cast_vote()`. El primer voto
+ * NUNCA se bloquea — el candado sólo gobierna CAMBIOS —, y `vote_change_window
+ * === null` significa "hasta el cierre", el mismo idioma que `closes_at`.
+ */
 export function voteAvailability(
-  prediction: StatusInput & Pick<PredictionRow, 'opens_at' | 'vote_interval' | 'voting_mode'>,
+  prediction: StatusInput &
+    Pick<PredictionRow, 'opens_at' | 'vote_interval' | 'voting_mode' | 'vote_change_window'>,
   votes: Vote[],
   at: Date = new Date(),
 ): VoteAvailability {
@@ -204,8 +219,23 @@ export function voteAvailability(
     return { canVote: false, reason: 'closed', nextAt: null }
   }
 
-  // Clásica: siempre se puede, porque cambiar el voto está permitido.
   if (prediction.voting_mode === 'single') {
+    const existing = votes[0] ?? null
+    // Sin voto previo, es el primer voto: nunca se bloquea.
+    if (!existing) {
+      return { canVote: true, reason: null, nextAt: null }
+    }
+
+    const windowMs = parsePgInterval(prediction.vote_change_window)
+    // NULL (sin match, "hasta el cierre") = sin límite.
+    if (windowMs === null) {
+      return { canVote: true, reason: null, nextAt: null }
+    }
+
+    const lockAt = toDate(existing.first_cast_at).getTime() + windowMs
+    if (at.getTime() > lockAt) {
+      return { canVote: false, reason: 'vote_locked', nextAt: null }
+    }
     return { canVote: true, reason: null, nextAt: null }
   }
 
@@ -222,6 +252,22 @@ export function voteAvailability(
     reason: null,
     nextAt: nextCycleAt(prediction.opens_at, prediction.vote_interval, at),
   }
+}
+
+/**
+ * Copy de la ventana de cambio de voto: reemplaza el viejo "Podés cambiarlo
+ * hasta el cierre" (que ya no es cierto para casi ninguna predicción) por la
+ * ventana real, o por el mismo texto de siempre cuando de verdad no hay
+ * límite.
+ */
+export function voteWindowCopy(voteChangeWindow: string | null): string {
+  const ms = parsePgInterval(voteChangeWindow)
+  if (voteChangeWindow === null || ms === null) return 'Podés cambiarlo hasta el cierre'
+  if (ms <= 0) return 'Tu voto queda firme apenas lo emitís'
+  if (ms < HOUR) return `Tenés ${Math.round(ms / MINUTE)} minutos para corregir tu voto`
+  if (ms < DAY) return `Tenés ${Math.round(ms / HOUR)} horas para corregir tu voto`
+  const days = Math.round(ms / DAY)
+  return `Tenés ${days} ${days === 1 ? 'día' : 'días'} para corregir tu voto`
 }
 
 // ---------------------------------------------------------------------------
@@ -263,23 +309,25 @@ export function sortFeed(predictions: Prediction[], now: Date = new Date()): Pre
 // ---------------------------------------------------------------------------
 
 /**
- * Espejo de `required_participants`/`required_close_requests` en SQL, para
- * previsualizar en el formulario de creación ANTES de que exista la fila (ahí
- * no hay ninguna predicción sobre la que pedirle el cálculo al servidor). El
+ * Espejo de `required_participants()` en SQL, para previsualizar en el
+ * formulario de creación ANTES de que exista la fila (ahí no hay ninguna
+ * predicción sobre la que pedirle el cálculo al servidor). El
  * `least(memberCount, …)` es el mismo fix que corrige el bug de los grupos
  * chicos; nunca se debe quitar acá tampoco.
  */
-function requiredCountPreview(memberCount: number, percent: number, floor: number): number {
-  const count = Math.max(0, memberCount)
-  return Math.max(floor, Math.min(count, Math.ceil((count * percent) / 100)))
-}
-
 export function requiredParticipantsPreview(memberCount: number, percent: number): number {
-  return requiredCountPreview(memberCount, percent, 1)
+  const count = Math.max(0, memberCount)
+  return Math.max(1, Math.min(count, Math.ceil((count * percent) / 100)))
 }
 
-export function requiredCloseRequestsPreview(memberCount: number, percent: number): number {
-  return requiredCountPreview(memberCount, percent, 2)
+/**
+ * Espejo de `required_close_requests(p_member_count, p_quorum)`: ya NO es un
+ * porcentaje, es la cantidad absoluta configurada en el grupo
+ * (`groups.close_request_quorum`), acotada al conteo vivo de integrantes.
+ * Piso 1 en ambos extremos — "con solo uno alcance si confías en el grupo".
+ */
+export function requiredCloseRequestsPreview(memberCount: number, quorum: number): number {
+  return Math.max(1, Math.min(Math.max(1, memberCount), quorum))
 }
 
 // ---------------------------------------------------------------------------

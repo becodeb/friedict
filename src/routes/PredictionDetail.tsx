@@ -21,6 +21,7 @@ import {
   effectiveStatus,
   isRevealed,
   voteAvailability,
+  voteWindowCopy,
 } from '@/lib/prediction'
 import { formatCountdown, formatDateTime, formatRelative } from '@/lib/time'
 import { friendlyError } from '@/lib/errors'
@@ -326,9 +327,11 @@ export function PredictionDetail() {
               Ya usaste tu voto de esta ronda. Votás de nuevo en{' '}
               {formatCountdown(availability.nextAt)}.
             </p>
+          ) : availability.reason === 'vote_locked' && data.myVote ? (
+            <p className="text-[0.875rem] text-[var(--ink-3)]">Tu voto quedó firme.</p>
           ) : availability.canVote && data.myVote ? (
             <p className="text-[0.875rem] text-[var(--ink-3)]">
-              Podés cambiar tu voto hasta el cierre.
+              {voteWindowCopy(data.vote_change_window)}.
             </p>
           ) : !revealed ? (
             <p className="text-[0.875rem] text-[var(--ink-3)]">
@@ -512,7 +515,11 @@ export function PredictionDetail() {
                 earlyRatio: 0,
                 convictionRatio: 1,
               }).base}{' '}
-              base × {Number(myScore.rarity_multiplier).toFixed(2)} por lo poco
+              base
+              {Number(myScore.duration_multiplier) !== 1
+                ? ` × ${Number(myScore.duration_multiplier).toFixed(2)} por cuánto duró`
+                : ''}{' '}
+              × {Number(myScore.rarity_multiplier).toFixed(2)} por lo poco
               elegida que estaba × {Number(myScore.early_multiplier).toFixed(2)} por
               haberla elegido temprano
               {Number(myScore.conviction_multiplier) < 1

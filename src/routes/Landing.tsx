@@ -148,10 +148,12 @@ export function Landing() {
           </RevealLine>
         </Reveal>
 
-        {/* Ejemplo: misma gramática visual que el feed real. */}
+        {/* Ejemplo: misma gramática visual que el feed real. El estado "en
+            prueba" es opcional (ver la sección de abajo); se muestra acá
+            porque es el más rico visualmente, no porque sea lo normal. */}
         <section className="mt-20 max-w-[34rem]" aria-labelledby="ejemplo-titulo">
           <h2 id="ejemplo-titulo" className="type-meta text-[var(--ink-3)]">
-            Así se ve una predicción
+            Así se ve una predicción — acá, con la calificación prendida
           </h2>
 
           <div className="card-pop relative mt-8 px-4 pb-4 pt-6 sm:px-5" aria-hidden="true">
@@ -210,12 +212,13 @@ export function Landing() {
             <Sticker tone="sun" cut tilt={-3} className="absolute -top-[15px] left-4">
               En prueba
             </Sticker>
-            <h2 className="type-title text-[1.25rem]">Las predicciones se ganan el lugar</h2>
+            <h2 className="type-title text-[1.25rem]">Ninguna predicción expira</h2>
             <p className="mt-2.5 leading-relaxed text-[var(--ink-2)]">
-              Cuando alguien propone una, entra <em>en prueba</em>. Necesita que la
-              elija un porcentaje del grupo — no un número fijo, así que un grupo de
-              2 puede calificar igual que uno de 20. Si no llega a tiempo, se va sola
-              y no ensucia el feed.
+              Por default, una predicción queda activa apenas se crea. Si el grupo
+              prefiere que se gane el lugar primero, puede prenderlo en sus
+              ajustes: ahí entra <em>en prueba</em> hasta que la elija un
+              porcentaje del grupo — sin plazo. Nunca se va sola por falta de
+              gente; sigue esperando el tiempo que haga falta.
             </p>
           </div>
           <div className="card-pop relative px-5 pb-5 pt-7">

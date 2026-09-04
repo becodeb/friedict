@@ -43,11 +43,24 @@ export const optionLabelSchema = trimmed(1, 60)
 const DAY_MS = 86_400_000
 
 /**
- * Porcentaje de quórum (calificación o cierre): entero entre 1 y 100. El
- * mismo rango que el `check` de la columna en `600_quorum_and_open_close.sql`
- * — si alguien saltea el formulario, la base rechaza igual.
+ * Porcentaje de quórum de calificación: entero entre 1 y 100. El mismo rango
+ * que el `check` de `groups.qualification_percent` en
+ * `700_group_settings.sql` — si alguien saltea el formulario, la base
+ * rechaza igual.
  */
 export const quorumPercentSchema = z.number().int().min(1).max(100)
+
+/** `groups.close_request_quorum`: entero, piso 1. El techo lo pone el conteo vivo del grupo, no este schema. */
+export const closeRequestQuorumSchema = z.number().int().min(1)
+
+export const voteChangeWindowSchema = z.enum(['until_close', '1d', '15m', 'never'])
+
+export const groupSettingsSchema = z.object({
+  closeRequestQuorum: closeRequestQuorumSchema,
+  qualificationEnabled: z.boolean(),
+  qualificationPercent: quorumPercentSchema,
+})
+export type GroupSettingsInput = z.infer<typeof groupSettingsSchema>
 
 export const createPredictionSchema = z
   .object({
@@ -64,9 +77,7 @@ export const createPredictionSchema = z
     // pide (prediction_close_requests). closesAt sólo hace falta en 'date'.
     closeMode: z.enum(['date', 'open']),
     closesAt: z.string().optional(),
-    qualificationPercent: quorumPercentSchema,
-    closePercent: quorumPercentSchema,
-    qualificationHours: z.number().int().min(1).max(720),
+    voteChangeWindow: voteChangeWindowSchema,
   })
   .superRefine((value, ctx) => {
     if (value.optionType !== 'members') {

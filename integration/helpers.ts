@@ -346,16 +346,39 @@ export async function sql<T = Record<string, unknown>>(
   }
 }
 
-/** Adelanta el reloj de una predicción moviendo sus fechas hacia atrás. */
-export async function timeTravel(predictionId: string, shift: string): Promise<void> {
+/**
+ * Adelanta el reloj de una predicción moviendo sus fechas hacia atrás.
+ *
+ * `qualification_deadline` YA NO se mueve: nada la lee (nada expira más), así
+ * que tocarla sería trabajo muerto — y en las filas nuevas es NULL, así que
+ * restarle un interval no haría nada de todos modos.
+ *
+ * `first_cast_at` es opcional: sirve para simular el paso del tiempo sobre la
+ * ventana de cambio de voto (`vote-window.test.ts`) sin depender de SQL
+ * suelto en cada test. Nunca toca `created_at` a propósito — ver el
+ * comentario largo en `705_vote_window_and_scoring.sql`.
+ */
+export async function timeTravel(
+  predictionId: string,
+  shift: string,
+  options: { firstCastAtUserId?: string } = {},
+): Promise<void> {
   await sql(
     `update public.predictions
         set opens_at = opens_at - $2::interval,
-            qualification_deadline = qualification_deadline - $2::interval,
             closes_at = closes_at - $2::interval
       where id = $1`,
     [predictionId, shift],
   )
+
+  if (options.firstCastAtUserId) {
+    await sql(
+      `update public.prediction_votes
+          set first_cast_at = first_cast_at - $3::interval
+        where prediction_id = $1 and user_id = $2`,
+      [predictionId, options.firstCastAtUserId, shift],
+    )
+  }
 }
 
 export async function finalize(): Promise<void> {

@@ -148,14 +148,21 @@ export function useCastVote(userId: string | null) {
         if (prediction.id !== predictionId || !userId) return prediction
 
         const alreadyVoted = prediction.myVote !== null
+        const nowIso = new Date().toISOString()
         const optimisticVote: Vote = {
           id: `optimistic-${optionId}`,
           prediction_id: predictionId,
           option_id: optionId,
           user_id: userId,
           cycle: prediction.myVote?.cycle ?? 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          // El ancla de seguridad de la ventana NO se toca en un cambio: se
+          // conserva la del voto anterior, si había uno. `option_selected_at`
+          // sí se mueve — es la marca de "cuándo se eligió la opción actual",
+          // y acá está cambiando de verdad.
+          first_cast_at: prediction.myVote?.first_cast_at ?? nowIso,
+          option_selected_at: nowIso,
+          created_at: nowIso,
+          updated_at: nowIso,
         }
 
         const isSingle = prediction.voting_mode === 'single'
@@ -236,9 +243,8 @@ export interface CreatePredictionVars {
   votesVisibility: 'visible' | 'on_close' | 'anonymous'
   /** `undefined` = sin fecha de cierre: cierra cuando el grupo lo pide. */
   closesAt?: string | undefined
-  qualificationPercent: number
-  closePercent: number
-  qualificationHours: number
+  /** Clave de presentación: `'until_close' | '1d' | '15m' | 'never'`. */
+  voteChangeWindow: string
 }
 
 export function useCreatePrediction() {
@@ -257,9 +263,7 @@ export function useCreatePrediction() {
         p_allow_new_options: vars.allowNewOptions,
         p_results_visibility: vars.resultsVisibility,
         p_votes_visibility: vars.votesVisibility,
-        p_qualification_percent: vars.qualificationPercent,
-        p_close_percent: vars.closePercent,
-        p_qualification_hours: vars.qualificationHours,
+        p_vote_change_window: vars.voteChangeWindow,
         ...(vars.closesAt ? { p_closes_at: vars.closesAt } : {}),
         ...(vars.description ? { p_description: vars.description } : {}),
         ...(vars.votingMode === 'recurring'
@@ -309,7 +313,6 @@ export function useCreateFromTemplate() {
         p_group_id: vars.groupId,
         p_template_id: vars.templateId,
         p_closes_at: vars.closesAt,
-        p_qualification_hours: 48,
       }),
     onSuccess: (_id, vars) => {
       void queryClient.invalidateQueries({ queryKey: qk.predictions(vars.groupId) })
@@ -404,6 +407,7 @@ export interface PredictionScoreRow {
   rarity_multiplier: number
   early_multiplier: number
   conviction_multiplier: number
+  duration_multiplier: number
   profile: { id: string; display_name: string; avatar_seed: string; accent: number } | null
 }
 

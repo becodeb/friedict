@@ -234,6 +234,7 @@ apiRouter.get('/predictions/:predictionId/scores', requireAuth, async (req, res,
          s.rarity_multiplier,
          s.early_multiplier,
          s.conviction_multiplier,
+         s.duration_multiplier,
          (
            select jsonb_build_object(
              'id', pr.id,

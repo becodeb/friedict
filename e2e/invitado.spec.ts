@@ -3,7 +3,9 @@ import {
   SEED,
   createPredictionAs,
   signInAs,
+  timeTravel,
   useLightTheme,
+  userIdFor,
   voteAs,
 } from './support'
 
@@ -47,14 +49,16 @@ test.describe('flujo del invitado', () => {
       'aria-checked',
       'true',
     )
-    await expect(card.getByText(/tu voto quedó guardado|podés cambiarlo/i)).toBeVisible()
+    await expect(
+      card.getByText(/tu voto quedó guardado|para corregir tu voto|hasta el cierre/i),
+    ).toBeVisible()
 
     // Y aparece en la lista de integrantes.
     await page.goto(`/g/${SEED.losPibes}/miembros`)
     await expect(page.locator('main')).toContainText('Vicky')
   })
 
-  test('puede cambiar su voto hasta el cierre', async ({ page }) => {
+  test('puede cambiar su voto DENTRO de la ventana', async ({ page }) => {
     await useLightTheme(page)
     await signInAs(page, 'fran@cantado.test')
     await page.goto(`/g/${SEED.losPibes}`)
@@ -87,6 +91,29 @@ test.describe('flujo del invitado', () => {
         .filter({ hasText: '¿Dónde terminamos cenando el sábado?' })
         .getByRole('radio', { name: 'Hamburguesas' }),
     ).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('NO puede cambiar su voto una vez vencida la ventana de 15 minutos', async ({ page }) => {
+    await useLightTheme(page)
+    const franId = await userIdFor('fran@cantado.test')
+
+    // Corre el ancla de seguridad del voto de Fran (nunca created_at) 20
+    // minutos al pasado, más allá de la ventana default de 15. El shift de
+    // opens_at/closes_at de la predicción es intrascendente acá: 20 minutos
+    // no la acerca a ningún límite real.
+    await timeTravel('bbbbbbbb-0000-4000-8000-000000000002', '20 minutes', {
+      firstCastAtUserId: franId,
+    })
+
+    await signInAs(page, 'fran@cantado.test')
+    await page.goto(`/g/${SEED.losPibes}`)
+
+    const card = page
+      .locator('article')
+      .filter({ hasText: '¿Dónde terminamos cenando el sábado?' })
+
+    await expect(card.getByText(/tu voto quedó firme/i)).toBeVisible()
+    await expect(card.getByRole('radio', { name: 'Sushi' })).toBeDisabled()
   })
 
   test('no ve qué votó el resto mientras la predicción está abierta', async ({ page }) => {

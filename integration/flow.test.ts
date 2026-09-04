@@ -171,13 +171,37 @@ describe('ciclo de vida completo', () => {
   describe('el umbral de las 3 personas', () => {
     let predictionId: string
 
-    it('una predicción nueva arranca en prueba', async () => {
+    it('sin el toggle de calificación, una predicción nace directamente activa', async () => {
+      const { data, error } = await ana.client.rpc('create_prediction', {
+        p_group_id: groupId,
+        p_title: '¿Nace activa por default?',
+        p_options: ['Sí', 'No'],
+        p_closes_at: inFuture(72),
+      })
+      expect(error).toBeNull()
+      expect(await predictionStatus(data as unknown as string)).toBe('active')
+    })
+
+    it('una predicción nueva arranca en prueba SÓLO con el toggle del grupo prendido', async () => {
+      // El 75% de 4 integrantes (Ana, Beto, Cami, Dani) da 3 — el mismo
+      // requisito "3 personas" de siempre, ahora explícito en el grupo.
+      const { error: settingsError } = await ana.client.rpc('update_group_settings', {
+        p_group_id: groupId,
+        p_qualification_enabled: true,
+        p_qualification_percent: 75,
+      })
+      expect(settingsError).toBeNull()
+
       const { data, error } = await ana.client.rpc('create_prediction', {
         p_group_id: groupId,
         p_title: '¿Quién se olvida el pasaporte?',
         p_options: ['Ana', 'Beto', 'Cami', 'Dani'],
         p_closes_at: inFuture(72),
-        p_qualification_hours: 48,
+        // "hasta el cierre": esta predicción se usa más abajo para probar
+        // que cambiar el voto no suma un participante nuevo, y esa prueba no
+        // tiene por qué depender de correr dentro de los 15 minutos del
+        // default.
+        p_vote_change_window: 'until_close',
       })
       expect(error).toBeNull()
 
@@ -186,8 +210,9 @@ describe('ciclo de vida completo', () => {
     })
 
     it('el cliente NO puede fabricar una predicción del sistema', async () => {
-      // `p_is_default` no existe en la firma pública: mandarlo es un error, no
-      // un atajo para saltearse el umbral.
+      // `p_is_default` no existe en la firma pública (ni en la de 12
+      // argumentos ni en ninguna otra): mandarlo es un error, no un atajo
+      // para saltearse el umbral.
       const { error } = await ana.client.rpc('create_prediction', {
         p_group_id: groupId,
         p_title: 'Intento de colarse como del sistema',
@@ -204,25 +229,20 @@ describe('ciclo de vida completo', () => {
       expect(rows[0]!.n).toBe(0)
     })
 
-    it('el cliente no puede saltarse el quórum: el porcentaje va acotado entre 1 y 100', async () => {
-      // `qualification_percent` es un `smallint check (between 1 and 100)`: un
-      // valor fuera de rango lo rechaza la base, no un clamp silencioso.
-      const { error } = await ana.client.rpc('create_prediction', {
+    it('el cliente no puede saltarse el quórum a nivel de GRUPO: el porcentaje va acotado entre 1 y 100', async () => {
+      // `qualification_percent` ahora es una columna de `groups`, escrita
+      // sólo por update_group_settings — el mismo `check (between 1 and
+      // 100)`, un nivel más arriba.
+      const { error } = await ana.client.rpc('update_group_settings', {
         p_group_id: groupId,
-        p_title: '¿Me auto-califico con mi propio voto?',
-        p_options: ['Sí', 'No'],
-        p_closes_at: inFuture(48),
         p_qualification_percent: 0,
       })
       expect(error).not.toBeNull()
     })
 
     it('el requisito real nunca supera la cantidad viva de integrantes del grupo', async () => {
-      const { data } = await ana.client.rpc('create_prediction', {
+      await ana.client.rpc('update_group_settings', {
         p_group_id: groupId,
-        p_title: '¿El quórum se acota al grupo?',
-        p_options: ['Sí', 'No'],
-        p_closes_at: inFuture(48),
         p_qualification_percent: 100,
       })
 
@@ -233,13 +253,20 @@ describe('ciclo de vida completo', () => {
 
       const rows = (await sql(
         `select public.required_participants(
-           (select count(*)::int from public.group_members where group_id = predictions.group_id),
+           (select count(*)::int from public.group_members where group_id = $1),
            qualification_percent
          ) as required
-         from public.predictions where id = $1`,
-        [data as unknown as string],
+         from public.groups where id = $1`,
+        [groupId],
       )) as Array<{ required: number }>
       expect(rows[0]!.required).toBe(memberCount[0]!.n)
+
+      // Se restaura el 75% para no romper las pruebas siguientes de este
+      // mismo bloque, que dependen del requisito "3 de 4".
+      await ana.client.rpc('update_group_settings', {
+        p_group_id: groupId,
+        p_qualification_percent: 75,
+      })
     })
 
     it('sigue en prueba con 1 y con 2 participantes', async () => {
@@ -300,13 +327,19 @@ describe('ciclo de vida completo', () => {
     })
   })
 
-  it('una predicción con 2 votantes expira al vencer el plazo', async () => {
+  it('una predicción con 2 votantes NUNCA expira, ni con el plazo vencido: nada expira más', async () => {
+    // El grupo sigue con el toggle prendido al 75% (bloque anterior): con 2
+    // de 4 no alcanza el umbral, así que antes de este cambio habría
+    // expirado. Ahora se queda "en prueba" para siempre, hasta que alguien
+    // más vote o el grupo apague la calificación.
+    // El cierre se pone bien lejos (30 días) para que, después de adelantar
+    // el reloj 3 días más abajo, siga sin llegar — lo que se prueba acá es
+    // la ausencia de expiración por participación, no el cierre por fecha.
     const { data } = await ana.client.rpc('create_prediction', {
       p_group_id: groupId,
       p_title: '¿Alguien lee los términos y condiciones?',
       p_options: ['Sí', 'No'],
-      p_closes_at: inFuture(72),
-      p_qualification_hours: 48,
+      p_closes_at: inFuture(24 * 30),
     })
     const predictionId = data as unknown as string
     const options = await optionsOf(predictionId)
@@ -325,7 +358,7 @@ describe('ciclo de vida completo', () => {
     await timeTravel(predictionId, '3 days')
     await finalize()
 
-    expect(await predictionStatus(predictionId)).toBe('expired')
+    expect(await predictionStatus(predictionId)).toBe('proposed')
   })
 
   it('una predicción del sistema NO expira por falta de participación', async () => {
@@ -373,8 +406,8 @@ describe('ciclo de vida completo', () => {
     const predictionId = data as unknown as string
     const options = await optionsOf(predictionId)
 
-    // Ronda 0. Votan tres para que supere el umbral: si no, al adelantar el
-    // reloj más abajo expiraría —correctamente— por falta de participación.
+    // Ronda 0. Votan tres para que supere el umbral (3 de 4, el 75% del
+    // grupo) y la predicción quede activa antes de adelantar el reloj.
     const first = await beto.client.rpc('cast_vote', {
       p_prediction_id: predictionId,
       p_option_id: options[0]!.id,
@@ -433,7 +466,6 @@ describe('ciclo de vida completo', () => {
         p_title: '¿Quién maneja en la ruta?',
         p_options: ['Ana', 'Beto', 'Cami', 'Dani'],
         p_closes_at: inFuture(48),
-        p_qualification_hours: 24,
       })
       predictionId = data as unknown as string
       options = await optionsOf(predictionId)

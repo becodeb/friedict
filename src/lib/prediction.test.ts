@@ -31,15 +31,18 @@ function makePrediction(overrides: Partial<PredictionRow> = {}): PredictionRow {
     option_type: 'manual',
     voting_mode: 'single',
     vote_interval: null,
+    // Postgres serializa `interval '15 minutes'` como "00:15:00" (formato
+    // reloj), no como texto de unidades — el fixture usa el mismo formato
+    // que realmente viaja desde la base.
+    vote_change_window: '00:15:00',
     allow_new_options: false,
     results_visibility: 'on_close',
     votes_visibility: 'on_close',
-    minimum_participants: 3,
-    qualification_percent: 60,
-    close_percent: 50,
     close_request_count: 0,
     closed_at: null,
-    qualification_deadline: hours(6),
+    // Rastro de auditoría, ya nada la lee: se deja en NULL, como en toda
+    // predicción creada después de este cambio.
+    qualification_deadline: null,
     opens_at: hours(-4),
     closes_at: days(2),
     is_default: false,
@@ -66,6 +69,8 @@ function makeVote(overrides: Partial<Vote> = {}): Vote {
     option_id: 'o1',
     user_id: 'u1',
     cycle: 0,
+    first_cast_at: hours(-1),
+    option_selected_at: hours(-1),
     created_at: hours(-1),
     updated_at: hours(-1),
     ...overrides,
@@ -119,30 +124,40 @@ describe('umbral de participación', () => {
 
 describe('effectiveStatus', () => {
   it.each([0, 1, 2])(
-    'expira con %i participantes cuando vence el plazo de calificación',
+    'con %i participantes y sin alcanzar el requisito, se queda "en prueba" para siempre: nada expira',
     (count) => {
       const prediction = withStatusInput(
-        makePrediction({ participant_count: count, qualification_deadline: hours(-1) }),
+        makePrediction({ participant_count: count, closes_at: null }),
       )
-      expect(effectiveStatus(prediction, NOW)).toBe('expired')
+      const lejano = new Date(NOW.getTime() + 100 * 365 * 86_400_000)
+      expect(effectiveStatus(prediction, NOW)).toBe('proposed')
+      expect(effectiveStatus(prediction, lejano)).toBe('proposed')
     },
   )
 
-  it('se mantiene con 3 participantes aunque venza el plazo', () => {
-    const prediction = withStatusInput(
-      makePrediction({ participant_count: 3, qualification_deadline: hours(-1) }),
-    )
+  it('una fila que YA está expired (de antes de este cambio) se queda expired: nada la revive', () => {
+    const prediction = withStatusInput(makePrediction({ status: 'expired', participant_count: 0 }))
+    expect(effectiveStatus(prediction, NOW)).toBe('expired')
+  })
+
+  it('se activa con 3 participantes', () => {
+    const prediction = withStatusInput(makePrediction({ participant_count: 3 }))
     expect(effectiveStatus(prediction, NOW)).toBe('active')
   })
 
   it('una predicción del sistema no expira nunca por falta de participación', () => {
     const prediction = withStatusInput(
-      makePrediction({ is_default: true, participant_count: 0, qualification_deadline: hours(-10) }),
+      makePrediction({ is_default: true, participant_count: 0 }),
     )
     expect(effectiveStatus(prediction, NOW)).toBe('active')
   })
 
-  it('sigue en prueba mientras no venza el plazo', () => {
+  it('con required_participants en 0 (el grupo no pide calificar), queda activa aunque nadie haya votado', () => {
+    const prediction = withStatusInput(makePrediction({ participant_count: 0 }), 0)
+    expect(effectiveStatus(prediction, NOW)).toBe('active')
+  })
+
+  it('sigue en prueba mientras no alcance el requisito', () => {
     const prediction = withStatusInput(makePrediction({ participant_count: 2 }))
     expect(effectiveStatus(prediction, NOW)).toBe('proposed')
   })
@@ -165,7 +180,6 @@ describe('effectiveStatus', () => {
     const prediction = withStatusInput(
       makePrediction({
         participant_count: 4,
-        qualification_deadline: hours(-20),
         closes_at: hours(-2),
       }),
     )
@@ -208,11 +222,47 @@ describe('votación clásica', () => {
     expect(voteAvailability(prediction, [], NOW).canVote).toBe(true)
   })
 
-  it('se puede CAMBIAR el voto hasta el cierre', () => {
+  it('se puede CAMBIAR el voto DENTRO de la ventana', () => {
     const prediction = withStatusInput(makePrediction({ participant_count: 3, status: 'active' }))
-    const availability = voteAvailability(prediction, [makeVote()], NOW)
+    // vote_change_window default es 15 minutos; el voto se emitió hace 5.
+    const availability = voteAvailability(
+      prediction,
+      [makeVote({ first_cast_at: new Date(NOW.getTime() - 5 * 60_000).toISOString() })],
+      NOW,
+    )
     expect(availability.canVote).toBe(true)
     expect(availability.reason).toBeNull()
+  })
+
+  it('NO se puede cambiar el voto una vez vencida la ventana: vote_locked', () => {
+    const prediction = withStatusInput(makePrediction({ participant_count: 3, status: 'active' }))
+    const availability = voteAvailability(
+      prediction,
+      [makeVote({ first_cast_at: new Date(NOW.getTime() - 20 * 60_000).toISOString() })],
+      NOW,
+    )
+    expect(availability.canVote).toBe(false)
+    expect(availability.reason).toBe('vote_locked')
+  })
+
+  it('con vote_change_window null ("hasta el cierre"), sigue sin límite sin importar cuándo se votó', () => {
+    const prediction = withStatusInput(
+      makePrediction({ participant_count: 3, status: 'active', vote_change_window: null }),
+    )
+    const availability = voteAvailability(
+      prediction,
+      [makeVote({ first_cast_at: days(-30) })],
+      NOW,
+    )
+    expect(availability.canVote).toBe(true)
+    expect(availability.reason).toBeNull()
+  })
+
+  it('el primer voto (sin fila previa) nunca se bloquea, incluso con la ventana ya "vencida" en abstracto', () => {
+    const prediction = withStatusInput(
+      makePrediction({ participant_count: 3, status: 'active', vote_change_window: '00:00:00' }),
+    )
+    expect(voteAvailability(prediction, [], NOW).canVote).toBe(true)
   })
 
   it('no se puede votar después del cierre', () => {
@@ -262,7 +312,6 @@ describe('votación evolutiva', () => {
         vote_interval: '7 days',
         opens_at: days(-21),
         closes_at: days(30),
-        qualification_deadline: days(-14),
         participant_count: 4,
         status: 'active',
         ...overrides,
@@ -439,12 +488,24 @@ describe('requiredParticipantsPreview / requiredCloseRequestsPreview (mirror del
     expect(requiredParticipantsPreview(10, 1)).toBe(1)
   })
 
-  it('el piso de cierre es 2, no 1', () => {
-    expect(requiredCloseRequestsPreview(1, 50)).toBe(2)
+  // requiredCloseRequestsPreview ya NO es un porcentaje: es la cantidad
+  // absoluta configurada en el grupo (groups.close_request_quorum), acotada
+  // al conteo vivo. Piso 1 en ambos extremos — "con solo uno alcance si
+  // confías en el grupo" es el pedido central del dueño.
+  it('(memberCount=1, quorum=1) da 1: el piso de 1 es intencional', () => {
+    expect(requiredCloseRequestsPreview(1, 1)).toBe(1)
   })
 
-  it('el cierre también se acota al conteo vivo', () => {
-    expect(requiredCloseRequestsPreview(2, 100)).toBe(2)
+  it('(memberCount=5, quorum=3) da 3: el quórum configurado, sin acotar', () => {
+    expect(requiredCloseRequestsPreview(5, 3)).toBe(3)
+  })
+
+  it('(memberCount=2, quorum=9) da 2: el quórum se acota al conteo vivo del grupo', () => {
+    expect(requiredCloseRequestsPreview(2, 9)).toBe(2)
+  })
+
+  it('(memberCount=3, quorum=0) da 1: el piso nunca baja de 1 aunque el quórum configurado sea 0', () => {
+    expect(requiredCloseRequestsPreview(3, 0)).toBe(1)
   })
 })
 

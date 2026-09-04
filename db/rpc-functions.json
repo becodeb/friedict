@@ -10,6 +10,15 @@
       "params": { "p_display_name": "text", "p_avatar_seed": "text", "p_accent": "smallint" }
     },
     "leave_group": { "shape": "void", "params": { "p_group_id": "uuid" } },
+    "update_group_settings": {
+      "shape": "row",
+      "params": {
+        "p_group_id": "uuid",
+        "p_close_request_quorum": "smallint",
+        "p_qualification_enabled": "boolean",
+        "p_qualification_percent": "smallint"
+      }
+    },
     "update_member_role": {
       "shape": "void",
       "params": { "p_group_id": "uuid", "p_user_id": "uuid", "p_role": "public.member_role" }
@@ -42,14 +51,12 @@
         "p_allow_new_options": "boolean",
         "p_results_visibility": "public.results_visibility",
         "p_votes_visibility": "public.votes_visibility",
-        "p_qualification_percent": "smallint",
-        "p_close_percent": "smallint",
-        "p_qualification_hours": "integer"
+        "p_vote_change_window": "text"
       }
     },
     "create_prediction_from_template": {
       "shape": "scalar",
-      "params": { "p_group_id": "uuid", "p_template_id": "uuid", "p_closes_at": "timestamptz", "p_qualification_hours": "integer" }
+      "params": { "p_group_id": "uuid", "p_template_id": "uuid", "p_closes_at": "timestamptz" }
     },
     "add_prediction_option": {
       "shape": "row",

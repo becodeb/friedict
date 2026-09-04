@@ -7,6 +7,7 @@ import {
   effectiveStatus,
   isRevealed,
   voteAvailability,
+  voteWindowCopy,
 } from '@/lib/prediction'
 import { Button } from '@/components/ui/Button'
 import { formatCountdown, formatRelative } from '@/lib/time'
@@ -264,7 +265,11 @@ export function PredictionCard({
                 size={14}
                 className="text-[var(--status-active-ink)]"
               />
-              {savedAt > 0 ? 'Tu voto quedó guardado' : 'Podés cambiarlo hasta el cierre'}
+              {savedAt > 0
+                ? 'Tu voto quedó guardado'
+                : availability.reason === 'vote_locked'
+                  ? 'Tu voto quedó firme'
+                  : voteWindowCopy(prediction.vote_change_window)}
             </p>
           ) : (
             <p className="text-[0.8125rem] text-[var(--ink-3)]">

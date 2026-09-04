@@ -93,15 +93,21 @@ describe('avisos en vivo', () => {
     await beto.client.rpc('join_group', { p_token: token, p_display_name: 'Beto' })
     await cami.client.rpc('join_group', { p_token: token, p_display_name: 'Cami' })
 
+    // El toggle se prende a nivel de GRUPO (antes era un parámetro por
+    // predicción). 100%: con el grupo de 3 integrantes de este test, el
+    // requisito da exactamente 3 — mismo comportamiento que verificaba este
+    // test antes del quórum por porcentaje.
+    await ana.client.rpc('update_group_settings', {
+      p_group_id: groupId,
+      p_qualification_enabled: true,
+      p_qualification_percent: 100,
+    })
+
     const { data: id } = await ana.client.rpc<string>('create_prediction', {
       p_group_id: groupId,
       p_title: '¿Llegamos a las 3 personas?',
       p_options: ['Sí', 'No'],
       p_closes_at: new Date(Date.now() + 48 * 3_600_000).toISOString(),
-      // 100%: con el grupo de 3 integrantes de este test, el requisito da
-      // exactamente 3 — mismo comportamiento que verificaba este test antes
-      // del quórum por porcentaje.
-      p_qualification_percent: 100,
     })
     predictionId = id!
 

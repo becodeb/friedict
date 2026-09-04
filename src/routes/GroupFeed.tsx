@@ -3,6 +3,7 @@ import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { Plus } from '@phosphor-icons/react'
 import { cn } from '@/lib/cn'
 import { useAuth } from '@/auth/useAuth'
+import { useGroup } from '@/data/groups'
 import { usePredictions } from '@/data/predictions'
 import { effectiveStatus, sortFeed } from '@/lib/prediction'
 import { cssMs } from '@/lib/css'
@@ -79,6 +80,10 @@ export function GroupFeed() {
   const [params, setParams] = useSearchParams()
 
   const predictions = usePredictions(groupId, user?.id ?? null)
+  const group = useGroup(groupId)
+  // Sin calificación prendida, ninguna predicción nace "en prueba": la
+  // pestaña no tiene nada que mostrar y sólo confundiría.
+  const qualificationEnabled = group.data?.qualification_enabled ?? false
   const [tab, setTab] = useState<TabValue>('abiertas')
   const [createOpen, setCreateOpen] = useState(params.get('nueva') === '1')
   const [everOpened, setEverOpened] = useState(createOpen)
@@ -114,6 +119,13 @@ export function GroupFeed() {
     }
   }, [predictions.data])
 
+  // Si el grupo apaga la calificación mientras la pestaña "En prueba" está
+  // activa, se cae a "Abiertas" durante el render — mismo patrón que el resto
+  // del archivo usa para correcciones derivadas, sin un efecto.
+  if (!qualificationEnabled && tab === 'prueba') {
+    setTab('abiertas')
+  }
+
   const visible = useDissolvingList(buckets[tab])
   const isEmpty = !predictions.isLoading && (predictions.data ?? []).length === 0
 
@@ -143,7 +155,9 @@ export function GroupFeed() {
             onChange={setTab}
             items={[
               { value: 'abiertas', label: 'Abiertas', count: buckets.abiertas.length },
-              { value: 'prueba', label: 'En prueba', count: buckets.prueba.length },
+              ...(qualificationEnabled
+                ? [{ value: 'prueba' as const, label: 'En prueba', count: buckets.prueba.length }]
+                : []),
               { value: 'cerradas', label: 'Cerradas', count: buckets.cerradas.length },
             ]}
           />

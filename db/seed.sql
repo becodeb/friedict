@@ -79,6 +79,13 @@ insert into public.group_members (group_id, user_id, role, joined_at) values
   ('aaaaaaaa-0000-4000-8000-000000000002', '33333333-3333-4333-8333-333333333333', 'member', now() - interval '12 days'),
   ('aaaaaaaa-0000-4000-8000-000000000002', '66666666-6666-4666-8666-666666666666', 'member', now() - interval '11 days');
 
+-- «Los pibes» prende la calificación: así las predicciones «en prueba»
+-- sembradas más abajo siguen significando algo. «Fútbol 5» se queda con el
+-- default (apagada), para poder ver a ojo el caso más común: una predicción
+-- que nace activa, sin nada que juntar.
+update public.groups set qualification_enabled = true
+ where id = 'aaaaaaaa-0000-4000-8000-000000000001';
+
 insert into public.group_invites (group_id, token, created_by, expires_at) values
   ('aaaaaaaa-0000-4000-8000-000000000001', 'seedseedseedseedseedseedseedseed', '11111111-1111-4111-8111-111111111111', now() + interval '7 days'),
   -- Invitación vencida, para probar la pantalla correspondiente.
@@ -87,6 +94,11 @@ insert into public.group_invites (group_id, token, created_by, expires_at) value
 -- ----------------------------------------------------------------------------
 -- Helper para armar predicciones de ejemplo
 -- ----------------------------------------------------------------------------
+-- `p_qual_at` se conserva en la firma (todos los llamados de más abajo lo
+-- pasan posicionalmente) pero deja de escribirse: qualification_deadline ya
+-- no la lee nadie, y toda predicción nueva la deja en NULL, igual que
+-- create_prediction(). La fila #5 sigue quedando 'expired' a mano, más abajo,
+-- como fixture de una fila anterior a este cambio — no por esta columna.
 create or replace function pg_temp.seed_prediction(
   p_id           uuid,
   p_group        uuid,
@@ -100,7 +112,6 @@ create or replace function pg_temp.seed_prediction(
   p_mode         public.voting_mode default 'single',
   p_interval     interval default null,
   p_is_default   boolean default false,
-  p_min          integer default 3,
   p_results_vis  public.results_visibility default 'on_close'
 ) returns void
 language plpgsql
@@ -113,13 +124,13 @@ begin
     id, group_id, created_by, title, description,
     option_type, voting_mode, vote_interval,
     results_visibility, votes_visibility,
-    minimum_participants, qualification_deadline, opens_at, closes_at,
+    opens_at, closes_at,
     is_default, created_at
   ) values (
     p_id, p_group, p_author, p_title, p_description,
     'manual', p_mode, p_interval,
     p_results_vis, 'on_close',
-    p_min::smallint, p_qual_at, p_opens_at, p_closes_at,
+    p_opens_at, p_closes_at,
     p_is_default, p_opens_at
   );
 
@@ -252,7 +263,7 @@ select pg_temp.seed_prediction(
   'Se vota una vez por semana. Vale cambiar de opinión.',
   array['Bauti', 'Juan', 'Agus', 'Fran', 'Lu'],
   now() - interval '42 days', now() + interval '60 days', now() - interval '35 days',
-  'recurring', interval '7 days', false, 3, 'always'
+  'recurring', interval '7 days', false, 'always'
 );
 do $$
 declare
